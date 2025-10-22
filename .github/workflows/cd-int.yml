@@ -1,0 +1,33 @@
+name: Deploy to Integration
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      image-tag:
+        description: "Docker image tag to deploy (default: int-{sha})"
+        required: false
+        type: string
+        default: ""
+      run-tests:
+        description: "Run integration tests after deployment"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  deploy-int:
+    name: Deploy to Integration
+    uses: projet-ccm2/shared-workflows/.github/workflows/nodejs-cd.yml@main
+    if: github.event_name != 'pull_request'
+    with:
+      docker-image-name: notification-handler-api-int
+      docker-tag: ${{ github.event.inputs.image-tag || format('dev-{0}', github.sha) }}
+      artifact-registry-repository: "notification-handler-docker-int"
+      environment: integration
+      cloud-run-service-name: notification-handler-int
+    secrets:
+      GCP_SA_KEY: ${{ secrets.INT_GCP_SA_KEY }}
+      GCP_PROJECT_ID: ${{ secrets.INT_GCP_PROJECT_ID }}
+      TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}

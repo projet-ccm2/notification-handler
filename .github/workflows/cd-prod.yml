@@ -1,0 +1,28 @@
+name: Deploy to Production
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to deploy (e.g., v1.2.3)"
+        required: true
+        type: string
+
+jobs:
+  deploy-prod:
+    name: Deploy to Production
+    uses: projet-ccm2/shared-workflows/.github/workflows/nodejs-cd.yml@main
+    if: github.event_name != 'pull_request'
+    with:
+      docker-image-name: notification-handler-api-prod
+      docker-tag: ${{ github.event.inputs.image-tag || format('dev-{0}', github.sha) }}
+      artifact-registry-repository: "notification-handler-docker-prod"
+      environment: production
+      cloud-run-service-name: notification-handler-prod
+
+    secrets:
+      GCP_SA_KEY: ${{ secrets.PROD_GCP_SA_KEY }}
+      GCP_PROJECT_ID: ${{ secrets.PROD_GCP_PROJECT_ID }}
+      TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
