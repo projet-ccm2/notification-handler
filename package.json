@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "express": "^5.1.0",
+    "redis": "^4.7.0",
     "winston": "^3.18.3"
   }
 }
