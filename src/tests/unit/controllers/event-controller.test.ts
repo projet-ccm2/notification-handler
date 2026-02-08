@@ -73,6 +73,56 @@ describe("EventController", () => {
     );
   });
 
+  it("returns error with eventId unknown when event has no id", async () => {
+    req.body = [
+      {
+        type: "message",
+        source: "twitch",
+        timestamp: "2025-01-01T00:00:00Z",
+        payload: {},
+      },
+    ];
+    await EventController.handleEvent(req as Request, res as Response);
+    expect(jsonMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errors: expect.arrayContaining([
+          expect.objectContaining({
+            eventId: "unknown",
+            error: "Missing required fields: id, type, source, or timestamp",
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it("serializes non-Error throw as string in error response", async () => {
+    req.body = [
+      {
+        id: "e1",
+        type: "message",
+        source: "twitch",
+        timestamp: "2025-01-01T00:00:00Z",
+        payload: {},
+      },
+    ];
+    (EventHandler.handleEvent as jest.Mock).mockRejectedValue(
+      "plain string error",
+    );
+    await EventController.handleEvent(req as Request, res as Response);
+    expect(jsonMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "partial",
+        failed: 1,
+        errors: expect.arrayContaining([
+          expect.objectContaining({
+            eventId: "e1",
+            error: "plain string error",
+          }),
+        ]),
+      }),
+    );
+  });
+
   it("returns 200 and success when all events processed", async () => {
     req.body = [
       {

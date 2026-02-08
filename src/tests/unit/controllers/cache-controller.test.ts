@@ -84,5 +84,20 @@ describe("CacheController", () => {
         message: "Failed to clear cache",
       });
     });
+
+    it("returns 500 when clearCacheByChannelId rejects with non-Error", async () => {
+      req.params = { channelId: "ch3" };
+      (CacheDbService.clearCacheByChannelId as jest.Mock).mockRejectedValue(
+        "string rejection",
+      );
+
+      await CacheController.clearChannelCache(req as Request, res as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(500);
+      expect(jsonMock).toHaveBeenCalledWith({
+        error: "Internal server error",
+        message: "Failed to clear cache",
+      });
+    });
   });
 });

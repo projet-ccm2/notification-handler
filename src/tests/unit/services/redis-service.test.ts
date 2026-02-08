@@ -9,6 +9,7 @@ jest.mock("../../../utils/logger", () => ({
   },
 }));
 
+let errorCallback: ((err: { message: string }) => void) | null = null;
 const mockClient = {
   get: jest.fn(),
   set: jest.fn(),
@@ -23,9 +24,12 @@ const mockClient = {
   keys: jest.fn(),
   connect: jest.fn().mockResolvedValue(undefined),
   quit: jest.fn().mockResolvedValue(undefined),
-  on: jest.fn((ev: string, cb: () => void) => {
+  on: jest.fn((ev: string, cb: (arg?: unknown) => void) => {
     if (ev === "ready") cb();
+    if (ev === "error")
+      errorCallback = cb as (err: { message: string }) => void;
   }),
+  scanIterator: jest.fn(),
 };
 
 jest.mock("redis", () => ({
@@ -109,5 +113,39 @@ describe("RedisService", () => {
       expect.stringContaining("redis.call('get'"),
       { keys: ["lock:3"], arguments: ["my-token"] },
     );
+  });
+
+  it("getTtl returns ttl from client", async () => {
+    mockClient.ttl.mockResolvedValue(42);
+    const result = await RedisService.getTtl("key");
+    expect(result).toBe(42);
+    expect(mockClient.ttl).toHaveBeenCalledWith("key");
+  });
+
+  it("deleteAllSyncDataForCacheKey calls del when keys found", async () => {
+    async function* keyGen() {
+      yield "sync:data:ck:a1";
+    }
+    mockClient.scanIterator.mockReturnValue(keyGen());
+    mockClient.del.mockResolvedValue(1);
+    await RedisService.deleteAllSyncDataForCacheKey("ck");
+    expect(mockClient.del).toHaveBeenCalledWith(["sync:data:ck:a1"]);
+  });
+
+  it("deleteAllSyncDataForCacheKey does not call del when no keys", async () => {
+    async function* keyGen() {
+      if (false) yield "x";
+    }
+    mockClient.scanIterator.mockReturnValue(keyGen());
+    await RedisService.deleteAllSyncDataForCacheKey("ck");
+    expect(mockClient.del).not.toHaveBeenCalled();
+  });
+
+  it("invokes error callback when Redis client emits error", async () => {
+    const { logger } = require("../../../utils/logger");
+    errorCallback?.({ message: "Connection refused" });
+    expect(logger.error).toHaveBeenCalledWith("Redis client error", {
+      error: "Connection refused",
+    });
   });
 });

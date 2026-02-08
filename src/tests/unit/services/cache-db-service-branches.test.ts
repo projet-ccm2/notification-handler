@@ -15,6 +15,7 @@ jest.mock("../../../services/redis-service");
 jest.mock("../../../services/db-service", () => ({
   DbService: {
     getUserAchievements: jest.fn(),
+    getAchievements: jest.fn(),
     putAchieved: jest.fn(),
   },
 }));
@@ -106,6 +107,104 @@ describe("CacheDbService branches", () => {
 
       expect(result).toHaveLength(1);
       expect(DbService.getUserAchievements).not.toHaveBeenCalled();
+    });
+
+    it("returns [] when lock not acquired and final cache read misses", async () => {
+      Redis.get
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+      Redis.acquireLock.mockResolvedValue(false);
+
+      const result = await CacheDbService.getAchievements(
+        "ch1",
+        "u1",
+        "points",
+      );
+
+      expect(result).toEqual([]);
+      expect(DbService.getUserAchievements).not.toHaveBeenCalled();
+    });
+
+    it("returns from final cache read when lock not acquired but cache filled by another", async () => {
+      const defs = [
+        {
+          id: "a1",
+          title: "T",
+          description: "D",
+          goal: 10,
+          reward: 5,
+          label: "L",
+          typeAchievement: { id: "t1", label: "points", data: "{}" },
+        },
+      ];
+      const achieved = [
+        {
+          achievementId: "a1",
+          userId: "u1",
+          count: 1,
+          finished: false,
+          labelActive: true,
+          acquiredDate: "2025-01-01",
+        },
+      ];
+      Redis.get
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(defs)
+        .mockResolvedValueOnce(achieved);
+      Redis.acquireLock.mockResolvedValue(false);
+
+      const result = await CacheDbService.getAchievements(
+        "ch1",
+        "u1",
+        "points",
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("a1");
+      expect(DbService.getUserAchievements).not.toHaveBeenCalled();
+    });
+
+    it("fetches definitions via getAchievements when getUserAchievements returns empty", async () => {
+      const channelDefs = [
+        {
+          id: "a1",
+          title: "T",
+          description: "D",
+          goal: 10,
+          reward: 5,
+          label: "L",
+          typeAchievement: { id: "t1", label: "points", data: "{}" },
+        },
+      ];
+      Redis.get
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+      Redis.acquireLock.mockResolvedValue("token");
+      Redis.releaseLock.mockResolvedValue(undefined);
+      Redis.set.mockResolvedValue(undefined);
+      DbService.getUserAchievements.mockResolvedValue([]);
+      (DbService.getAchievements as jest.Mock).mockResolvedValue(channelDefs);
+
+      const result = await CacheDbService.getAchievements(
+        "ch1",
+        "u1",
+        "points",
+      );
+
+      expect(DbService.getUserAchievements).toHaveBeenCalledWith("u1", "ch1");
+      expect(DbService.getAchievements).toHaveBeenCalledWith("ch1");
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("a1");
+      expect(result[0].achieved).toBeNull();
     });
   });
 
@@ -298,6 +397,56 @@ describe("CacheDbService branches", () => {
       expect(DbService.getUserAchievements).toHaveBeenCalledWith("u1", "ch1");
       expect(Redis.set).toHaveBeenCalled();
       expect(Redis.addToSyncSet).toHaveBeenCalledWith("user_achieved:u1:ch1");
+    });
+  });
+
+  describe("clearCacheByChannelId", () => {
+    it("deletes achievements key and all user achieved keys for channel", async () => {
+      Redis.delete.mockResolvedValue(undefined);
+      Redis.getKeysByPattern.mockResolvedValue([
+        "user_achieved:u1:ch1",
+        "user_achieved:u2:ch1",
+      ]);
+      Redis.removeFromSyncSet.mockResolvedValue(undefined);
+      Redis.deleteAllSyncDataForCacheKey.mockResolvedValue(undefined);
+
+      await CacheDbService.clearCacheByChannelId("ch1");
+
+      expect(Redis.delete).toHaveBeenCalledWith("achievements:ch1");
+      expect(Redis.getKeysByPattern).toHaveBeenCalledWith(
+        "user_achieved:*:ch1",
+      );
+      expect(Redis.removeFromSyncSet).toHaveBeenCalledWith(
+        "user_achieved:u1:ch1",
+      );
+      expect(Redis.removeFromSyncSet).toHaveBeenCalledWith(
+        "user_achieved:u2:ch1",
+      );
+      expect(Redis.deleteAllSyncDataForCacheKey).toHaveBeenCalledWith(
+        "user_achieved:u1:ch1",
+      );
+      expect(Redis.deleteAllSyncDataForCacheKey).toHaveBeenCalledWith(
+        "user_achieved:u2:ch1",
+      );
+      expect(Redis.delete).toHaveBeenCalledWith(
+        "read:lock:user_achieved:u1:ch1",
+      );
+      expect(Redis.delete).toHaveBeenCalledWith("lock:user_achieved:u1:ch1");
+      expect(Redis.delete).toHaveBeenCalledWith(
+        "sync:lock:user_achieved:u1:ch1",
+      );
+      expect(Redis.delete).toHaveBeenCalledWith("user_achieved:u1:ch1");
+    });
+
+    it("only deletes achievements key when no user achieved keys", async () => {
+      Redis.delete.mockResolvedValue(undefined);
+      Redis.getKeysByPattern.mockResolvedValue([]);
+
+      await CacheDbService.clearCacheByChannelId("ch2");
+
+      expect(Redis.delete).toHaveBeenCalledWith("achievements:ch2");
+      expect(Redis.removeFromSyncSet).not.toHaveBeenCalled();
+      expect(Redis.deleteAllSyncDataForCacheKey).not.toHaveBeenCalled();
     });
   });
 });
