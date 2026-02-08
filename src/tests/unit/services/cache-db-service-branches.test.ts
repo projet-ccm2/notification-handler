@@ -1,0 +1,263 @@
+import { CacheDbService } from "../../../services/cache-db-service";
+import { RedisService } from "../../../services/redis-service";
+import { UserAchievement } from "../../../types/classes/user-achievement";
+
+jest.mock("../../../utils/logger", () => ({
+  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() },
+}));
+
+jest.mock("../../../services/redis-service");
+jest.mock("../../../services/db-service", () => ({
+  DbService: {
+    getUserAchievements: jest.fn(),
+    putAchieved: jest.fn(),
+  },
+}));
+
+const Redis = RedisService as jest.Mocked<typeof RedisService>;
+const { DbService } = require("../../../services/db-service");
+
+describe("CacheDbService branches", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe("getAchievements", () => {
+    it("returns from cache on retry when lock not acquired", async () => {
+      const defs = [
+        {
+          id: "a1",
+          title: "T",
+          description: "D",
+          goal: 10,
+          reward: 5,
+          label: "L",
+          typeAchievement: { id: "t1", label: "points", data: "{}" },
+        },
+      ];
+      const achieved = [
+        {
+          achievementId: "a1",
+          userId: "u1",
+          count: 1,
+          finished: false,
+          labelActive: true,
+          acquiredDate: "2025-01-01",
+        },
+      ];
+      Redis.get
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(defs)
+        .mockResolvedValueOnce(achieved);
+      Redis.acquireLock.mockResolvedValue(false);
+
+      const result = await CacheDbService.getAchievements("ch1", "u1", "points");
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("a1");
+      expect(DbService.getUserAchievements).not.toHaveBeenCalled();
+    });
+
+    it("returns from cache when defsAgain and achievedAgain present inside try", async () => {
+      const defs = [
+        {
+          id: "a1",
+          title: "T",
+          description: "D",
+          goal: 10,
+          reward: 5,
+          label: "L",
+          typeAchievement: { id: "t1", label: "points", data: "{}" },
+        },
+      ];
+      const achieved = [
+        {
+          achievementId: "a1",
+          userId: "u1",
+          count: 1,
+          finished: false,
+          labelActive: true,
+          acquiredDate: "2025-01-01",
+        },
+      ];
+      Redis.get
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(defs)
+        .mockResolvedValueOnce(achieved);
+      Redis.acquireLock.mockResolvedValue(true);
+      Redis.releaseLock.mockResolvedValue(undefined);
+
+      const result = await CacheDbService.getAchievements("ch2", "u1", "points");
+
+      expect(result).toHaveLength(1);
+      expect(DbService.getUserAchievements).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("refreshExpiredCacheEntries", () => {
+    it("removes from sync set when syncDataList is empty", async () => {
+      Redis.getPendingSyncKeys.mockResolvedValue(["user_achieved:u1:ch1"]);
+      Redis.acquireLock.mockResolvedValue(true);
+      Redis.getTtl.mockResolvedValue(-1);
+      Redis.exists.mockResolvedValue(false);
+      Redis.getAllSyncDataForCacheKey.mockResolvedValue([]);
+      Redis.removeFromSyncSet.mockResolvedValue(undefined);
+      Redis.releaseLock.mockResolvedValue(undefined);
+
+      await CacheDbService.refreshExpiredCacheEntries();
+
+      expect(Redis.removeFromSyncSet).toHaveBeenCalledWith("user_achieved:u1:ch1");
+      expect(DbService.putAchieved).not.toHaveBeenCalled();
+    });
+
+    it("calls putAchieved and cleans up when cache expired and sync data exists", async () => {
+      Redis.getPendingSyncKeys.mockResolvedValue(["user_achieved:u2:ch2"]);
+      Redis.acquireLock.mockResolvedValue(true);
+      Redis.getTtl.mockResolvedValue(0);
+      Redis.exists.mockResolvedValue(false);
+      Redis.getAllSyncDataForCacheKey.mockResolvedValue([
+        {
+          userId: "u2",
+          achievementId: "a2",
+          data: { count: 5, finished: true, labelActive: false, acquiredDate: "2025-01-01" },
+        },
+      ]);
+      Redis.deleteAllSyncDataForCacheKey.mockResolvedValue(undefined);
+      Redis.removeFromSyncSet.mockResolvedValue(undefined);
+      Redis.exists.mockResolvedValueOnce(false).mockResolvedValueOnce(false);
+      Redis.releaseLock.mockResolvedValue(undefined);
+
+      await CacheDbService.refreshExpiredCacheEntries();
+
+      expect(DbService.putAchieved).toHaveBeenCalledWith(
+        expect.objectContaining({
+          achievementId: "a2",
+          userId: "u2",
+          count: 5,
+          finished: true,
+        })
+      );
+      expect(Redis.deleteAllSyncDataForCacheKey).toHaveBeenCalledWith("user_achieved:u2:ch2");
+      expect(Redis.removeFromSyncSet).toHaveBeenCalledWith("user_achieved:u2:ch2");
+    });
+
+    it("skips when lock not acquired", async () => {
+      Redis.getPendingSyncKeys.mockResolvedValue(["user_achieved:u3:ch3"]);
+      Redis.acquireLock.mockResolvedValue(false);
+
+      await CacheDbService.refreshExpiredCacheEntries();
+
+      expect(Redis.getTtl).not.toHaveBeenCalled();
+      expect(DbService.putAchieved).not.toHaveBeenCalled();
+    });
+
+    it("continues when ttl > 0 and exists", async () => {
+      Redis.getPendingSyncKeys.mockResolvedValue(["user_achieved:u4:ch4"]);
+      Redis.acquireLock.mockResolvedValue(true);
+      Redis.getTtl.mockResolvedValue(100);
+      Redis.exists.mockResolvedValue(true);
+      Redis.releaseLock.mockResolvedValue(undefined);
+
+      await CacheDbService.refreshExpiredCacheEntries();
+
+      expect(Redis.getAllSyncDataForCacheKey).not.toHaveBeenCalled();
+      expect(DbService.putAchieved).not.toHaveBeenCalled();
+    });
+
+    it("deletes cache key when it still exists after sync", async () => {
+      Redis.getPendingSyncKeys.mockResolvedValue(["user_achieved:u5:ch5"]);
+      Redis.acquireLock.mockResolvedValue(true);
+      Redis.getTtl.mockResolvedValue(-1);
+      Redis.exists
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true);
+      Redis.getAllSyncDataForCacheKey.mockResolvedValue([
+        { userId: "u5", achievementId: "a5", data: { count: 1, finished: false, labelActive: false, acquiredDate: "" } },
+      ]);
+      Redis.deleteAllSyncDataForCacheKey.mockResolvedValue(undefined);
+      Redis.removeFromSyncSet.mockResolvedValue(undefined);
+      Redis.delete.mockResolvedValue(undefined);
+      Redis.releaseLock.mockResolvedValue(undefined);
+
+      await CacheDbService.refreshExpiredCacheEntries();
+
+      expect(Redis.delete).toHaveBeenCalledWith("user_achieved:u5:ch5");
+    });
+  });
+
+  describe("update", () => {
+    it("throws when lock not acquired after 10 attempts", async () => {
+      Redis.acquireLock.mockResolvedValue(false);
+
+      const u = new UserAchievement(
+        "a1",
+        "T",
+        "D",
+        1,
+        1,
+        "L",
+        null,
+        { achievementId: "a1", userId: "u1", count: 0, finished: false, labelActive: false, acquiredDate: "" },
+        "ch1"
+      );
+
+      await expect(CacheDbService.update(u)).rejects.toThrow("Failed to acquire lock");
+      expect(Redis.acquireLock).toHaveBeenCalledTimes(10);
+    });
+
+    it("calls getAchievements when achievedList is null then updates", async () => {
+      const achievedItem = {
+        achievementId: "a1",
+        userId: "u1",
+        count: 1,
+        finished: false,
+        labelActive: false,
+        acquiredDate: "2025-01-01",
+      };
+      let getCallCount = 0;
+      Redis.get.mockImplementation(() => {
+        getCallCount++;
+        if (getCallCount === 1) return Promise.resolve(null);
+        if (getCallCount <= 6) return Promise.resolve(null);
+        return Promise.resolve([achievedItem]);
+      });
+      Redis.acquireLock.mockResolvedValue(true);
+      Redis.set.mockResolvedValue(undefined);
+      Redis.addToSyncSet.mockResolvedValue(undefined);
+      Redis.storeSyncData.mockResolvedValue(undefined);
+      Redis.releaseLock.mockResolvedValue(undefined);
+      DbService.getUserAchievements.mockResolvedValue([
+        {
+          id: "a1",
+          title: "T",
+          description: "D",
+          goal: 1,
+          reward: 1,
+          label: "L",
+          typeAchievement: { id: "t1", label: "points", data: "{}" },
+          achieved: achievedItem,
+        },
+      ]);
+
+      const u = new UserAchievement(
+        "a1",
+        "T",
+        "D",
+        1,
+        1,
+        "L",
+        { id: "t1", label: "points", data: "{}" },
+        achievedItem,
+        "ch1"
+      );
+
+      await CacheDbService.update(u);
+
+      expect(DbService.getUserAchievements).toHaveBeenCalledWith("u1", "ch1");
+      expect(Redis.set).toHaveBeenCalled();
+      expect(Redis.addToSyncSet).toHaveBeenCalledWith("user_achieved:u1:ch1");
+    });
+  });
+});

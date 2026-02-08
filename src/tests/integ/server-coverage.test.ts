@@ -40,9 +40,17 @@ describe("Server Coverage Tests", () => {
       }),
       get: jest.fn(),
       disable: jest.fn(),
+      use: jest.fn().mockReturnThis(),
     };
 
-    jest.doMock("express", () => jest.fn(() => mockApp));
+    const mockRouter = { post: jest.fn().mockReturnThis(), get: jest.fn().mockReturnThis(), use: jest.fn().mockReturnThis() };
+    const expressFn = jest.fn(() => mockApp);
+    (expressFn as any).json = jest.fn();
+    jest.doMock("express", () => ({
+      __esModule: true,
+      default: expressFn,
+      Router: jest.fn(() => mockRouter),
+    }));
 
     const mockLogger = {
       info: jest.fn(),
@@ -59,6 +67,10 @@ describe("Server Coverage Tests", () => {
       config: {
         nodeEnv: "development",
         port: 3000,
+        cors: { allowedOrigins: [] },
+        dbGateway: { baseUrl: "http://localhost:8080" },
+        redis: { url: "redis://localhost:6379" },
+        cache: { ttl: 3600 },
       },
     }));
 

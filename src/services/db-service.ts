@@ -1,7 +1,11 @@
 import { config } from "../config/environment";
-import { Achievement, UserAchievement, UpdateUserAchievementRequest } from "../types";
+import {
+  AchievementWithType,
+  CachedUserAchievement,
+  UserAchievementsResponse,
+} from "../types";
 
-const fetchJson = async (url: string): Promise<any> => {
+const fetchJson = async <T>(url: string): Promise<T> => {
   const response = await fetch(url, {
     method: "GET",
     headers: { "Content-Type": "application/json" },
@@ -10,9 +14,9 @@ const fetchJson = async (url: string): Promise<any> => {
   return response.json();
 };
 
-const postJson = async (url: string, body: any): Promise<void> => {
+const putJson = async (url: string, body: object): Promise<void> => {
   const response = await fetch(url, {
-    method: "POST",
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -20,22 +24,30 @@ const postJson = async (url: string, body: any): Promise<void> => {
 };
 
 export class DbService {
-  static async getAchievements(channelId: string): Promise<Achievement[]> {
-    return fetchJson(`${config.dbGateway.baseUrl}/achievements/${channelId}`);
-  }
-
-  static async getUserAchievements(userId: string, channelId: string): Promise<UserAchievement[]> {
-    return fetchJson(`${config.dbGateway.baseUrl}/achievements/user/${userId}/channel/${channelId}`);
-  }
-
-  static async updateUserAchievement(
-    userId: string,
-    achievementId: string,
-    data: UpdateUserAchievementRequest
-  ): Promise<void> {
-    await postJson(
-      `${config.dbGateway.baseUrl}/users/${userId}/achievements/${achievementId}`,
-      data
+  static async getAchievements(channelId: string): Promise<AchievementWithType[]> {
+    return fetchJson<AchievementWithType[]>(
+      `${config.dbGateway.baseUrl}/achievements/channel/${channelId}`
     );
+  }
+
+  static async getUserAchievements(
+    userId: string,
+    channelId: string
+  ): Promise<CachedUserAchievement[]> {
+    const res = await fetchJson<UserAchievementsResponse>(
+      `${config.dbGateway.baseUrl}/achievements/user/${userId}/channel/${channelId}`
+    );
+    return res.achievements;
+  }
+
+  static async putAchieved(body: {
+    achievementId: string;
+    userId: string;
+    count: number;
+    finished: boolean;
+    labelActive: boolean;
+    acquiredDate: string;
+  }): Promise<void> {
+    await putJson(`${config.dbGateway.baseUrl}/achieved`, body);
   }
 }

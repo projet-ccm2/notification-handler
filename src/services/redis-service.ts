@@ -9,7 +9,8 @@ export class RedisService {
   static async connect(): Promise<void> {
     if (this.client && this.isConnected) return;
 
-    this.client = createClient({ url: config.redis.url });
+    const url = process.env.REDIS_URL ?? config.redis.url;
+    this.client = createClient({ url });
     this.client.on("error", (err) => logger.error("Redis client error", { error: err.message }));
     this.client.on("connect", () => logger.info("Redis client connecting"));
     this.client.on("ready", () => {
