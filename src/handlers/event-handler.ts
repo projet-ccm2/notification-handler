@@ -7,6 +7,7 @@ import { UnknownEventHandler } from "./unknown-event-handler";
 export class EventHandler {
   static async handleEvent(event: TwitchEvent): Promise<void> {
     try {
+      // TODO: Implement event all handler (depend of all tickets)
       switch (event.type) {
         case "message":
           await MessageHandler.handle(event);
