@@ -95,7 +95,7 @@ describe("CacheDbService branches", () => {
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(defs)
         .mockResolvedValueOnce(achieved);
-      Redis.acquireLock.mockResolvedValue(true);
+      Redis.acquireLock.mockResolvedValue("token");
       Redis.releaseLock.mockResolvedValue(undefined);
 
       const result = await CacheDbService.getAchievements(
@@ -112,7 +112,7 @@ describe("CacheDbService branches", () => {
   describe("refreshExpiredCacheEntries", () => {
     it("removes from sync set when syncDataList is empty", async () => {
       Redis.getPendingSyncKeys.mockResolvedValue(["user_achieved:u1:ch1"]);
-      Redis.acquireLock.mockResolvedValue(true);
+      Redis.acquireLock.mockResolvedValue("token");
       Redis.getTtl.mockResolvedValue(-1);
       Redis.exists.mockResolvedValue(false);
       Redis.getAllSyncDataForCacheKey.mockResolvedValue([]);
@@ -129,7 +129,7 @@ describe("CacheDbService branches", () => {
 
     it("calls putAchieved and cleans up when cache expired and sync data exists", async () => {
       Redis.getPendingSyncKeys.mockResolvedValue(["user_achieved:u2:ch2"]);
-      Redis.acquireLock.mockResolvedValue(true);
+      Redis.acquireLock.mockResolvedValue("token");
       Redis.getTtl.mockResolvedValue(0);
       Redis.exists.mockResolvedValue(false);
       Redis.getAllSyncDataForCacheKey.mockResolvedValue([
@@ -179,7 +179,7 @@ describe("CacheDbService branches", () => {
 
     it("continues when ttl > 0 and exists", async () => {
       Redis.getPendingSyncKeys.mockResolvedValue(["user_achieved:u4:ch4"]);
-      Redis.acquireLock.mockResolvedValue(true);
+      Redis.acquireLock.mockResolvedValue("token");
       Redis.getTtl.mockResolvedValue(100);
       Redis.exists.mockResolvedValue(true);
       Redis.releaseLock.mockResolvedValue(undefined);
@@ -192,7 +192,7 @@ describe("CacheDbService branches", () => {
 
     it("deletes cache key when it still exists after sync", async () => {
       Redis.getPendingSyncKeys.mockResolvedValue(["user_achieved:u5:ch5"]);
-      Redis.acquireLock.mockResolvedValue(true);
+      Redis.acquireLock.mockResolvedValue("token");
       Redis.getTtl.mockResolvedValue(-1);
       Redis.exists.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
       Redis.getAllSyncDataForCacheKey.mockResolvedValue([
@@ -263,7 +263,7 @@ describe("CacheDbService branches", () => {
         if (getCallCount <= 6) return Promise.resolve(null);
         return Promise.resolve([achievedItem]);
       });
-      Redis.acquireLock.mockResolvedValue(true);
+      Redis.acquireLock.mockResolvedValue("token");
       Redis.set.mockResolvedValue(undefined);
       Redis.addToSyncSet.mockResolvedValue(undefined);
       Redis.storeSyncData.mockResolvedValue(undefined);

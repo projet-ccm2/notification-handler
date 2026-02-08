@@ -70,9 +70,16 @@ export class CacheDbService {
     }
 
     const lockKey = `read:lock:${cacheKeyUser}`;
-    const lockAcquired = await RedisService.acquireLock(lockKey, 10);
-    if (!lockAcquired) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+    const maxLockAttempts = 15;
+    const baseDelayMs = 50;
+    const maxDelayMs = 500;
+
+    let lockToken: string | false = false;
+    for (let attempt = 0; attempt < maxLockAttempts; attempt++) {
+      lockToken = await RedisService.acquireLock(lockKey, 10);
+      if (lockToken) break;
+      const delay = Math.min(baseDelayMs * (attempt + 1), maxDelayMs);
+      await new Promise((resolve) => setTimeout(resolve, delay));
       const retryDefs =
         await RedisService.get<AchievementWithType[]>(cacheKeyAchievements);
       const retryAchieved = await RedisService.get<Achieved[]>(cacheKeyUser);
@@ -84,6 +91,21 @@ export class CacheDbService {
           typeAchievement,
         );
       }
+    }
+
+    if (!lockToken) {
+      const finalDefs =
+        await RedisService.get<AchievementWithType[]>(cacheKeyAchievements);
+      const finalAchieved = await RedisService.get<Achieved[]>(cacheKeyUser);
+      if (finalDefs && finalAchieved !== null) {
+        return this.mergeAndFilter(
+          finalDefs,
+          finalAchieved,
+          channelId,
+          typeAchievement,
+        );
+      }
+      return [];
     }
 
     try {
@@ -103,18 +125,25 @@ export class CacheDbService {
         userId,
         channelId,
       );
-      const definitions: AchievementWithType[] = apiResponse.map((item) => ({
-        id: item.id,
-        title: item.title,
-        description: item.description,
-        goal: item.goal,
-        reward: item.reward,
-        label: item.label,
-        typeAchievement: item.typeAchievement,
-      }));
-      const achievedList: Achieved[] = apiResponse
-        .map((item) => item.achieved)
-        .filter((a): a is Achieved => a !== null);
+      let definitions: AchievementWithType[];
+      let achievedList: Achieved[];
+      if (apiResponse.length === 0) {
+        definitions = await DbService.getAchievements(channelId);
+        achievedList = [];
+      } else {
+        definitions = apiResponse.map((item) => ({
+          id: item.id,
+          title: item.title,
+          description: item.description,
+          goal: item.goal,
+          reward: item.reward,
+          label: item.label,
+          typeAchievement: item.typeAchievement,
+        }));
+        achievedList = apiResponse
+          .map((item) => item.achieved)
+          .filter((a): a is Achieved => a !== null);
+      }
 
       await RedisService.set(cacheKeyAchievements, definitions, this.CACHE_TTL);
       await RedisService.set(cacheKeyUser, achievedList, this.CACHE_TTL);
@@ -126,7 +155,7 @@ export class CacheDbService {
         typeAchievement,
       );
     } finally {
-      if (lockAcquired) await RedisService.releaseLock(lockKey);
+      if (lockToken) await RedisService.releaseLock(lockKey, lockToken);
     }
   }
 
@@ -140,8 +169,8 @@ export class CacheDbService {
     const lockKey = `lock:${cacheKey}`;
 
     for (let attempt = 0; attempt < 10; attempt++) {
-      const lockAcquired = await RedisService.acquireLock(lockKey, 10);
-      if (!lockAcquired) {
+      const lockToken = await RedisService.acquireLock(lockKey, 10);
+      if (!lockToken) {
         await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
         continue;
       }
@@ -178,7 +207,7 @@ export class CacheDbService {
         });
         return;
       } finally {
-        await RedisService.releaseLock(lockKey);
+        await RedisService.releaseLock(lockKey, lockToken);
       }
     }
 
@@ -192,9 +221,9 @@ export class CacheDbService {
 
     for (const cacheKey of pendingKeys) {
       const lockKey = `sync:lock:${cacheKey}`;
-      const lockAcquired = await RedisService.acquireLock(lockKey, 30);
+      const lockToken = await RedisService.acquireLock(lockKey, 30);
 
-      if (!lockAcquired) continue;
+      if (!lockToken) continue;
 
       try {
         const ttl = await RedisService.getTtl(cacheKey);
@@ -223,7 +252,7 @@ export class CacheDbService {
         if (await RedisService.exists(cacheKey))
           await RedisService.delete(cacheKey);
       } finally {
-        await RedisService.releaseLock(lockKey);
+        await RedisService.releaseLock(lockKey, lockToken);
       }
     }
   }

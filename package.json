@@ -14,7 +14,7 @@
     "test": "jest --testPathPattern='src/' --runInBand --coverage --coverageReporters=lcov --passWithNoTests --forceExit",
     "test:coverage": "jest --testPathPattern='src/' --runInBand --coverage --coverageReporters=text --coverageReporters=lcov --coverageReporters=json --passWithNoTests --forceExit",
     "test:watch": "jest --testPathPattern='src/' --watch --coverage --passWithNoTests",
-    "test:ci": "jest --testPathPattern='src/' --runInBand --coverage --coverageReporters=lcov --coverageReporters=json --ci --watchAll=false --passWithNoTests --forceExit"
+    "test:ci": "jest --testPathPattern='src/' --runInBand --coverage --coverageReporters=lcov --coverageReporters=json --ci --watchAll=false --passWithNoTests --detectOpenHandles --forceExit"
   },
   "devDependencies": {
     "@testcontainers/redis": "^11.11.0",

@@ -19,8 +19,7 @@ const mockClient = {
   sAdd: jest.fn(),
   sRem: jest.fn(),
   sMembers: jest.fn(),
-  setNX: jest.fn(),
-  expire: jest.fn(),
+  eval: jest.fn(),
   keys: jest.fn(),
   connect: jest.fn().mockResolvedValue(undefined),
   quit: jest.fn().mockResolvedValue(undefined),
@@ -86,18 +85,29 @@ describe("RedisService", () => {
     expect(mockClient.setEx).not.toHaveBeenCalled();
   });
 
-  it("acquireLock sets expire when lock acquired", async () => {
-    mockClient.setNX.mockResolvedValue(true);
-    mockClient.expire.mockResolvedValue(true);
+  it("acquireLock returns token when lock acquired", async () => {
+    mockClient.set.mockResolvedValue("OK");
     const result = await RedisService.acquireLock("lock:1", 15);
-    expect(result).toBe(true);
-    expect(mockClient.expire).toHaveBeenCalledWith("lock:1", 15);
+    expect(typeof result).toBe("string");
+    expect(result).not.toBe(false);
+    expect(mockClient.set).toHaveBeenCalledWith("lock:1", result, {
+      NX: true,
+      EX: 15,
+    });
   });
 
-  it("acquireLock returns false when setNX fails", async () => {
-    mockClient.setNX.mockResolvedValue(false);
+  it("acquireLock returns false when key already set", async () => {
+    mockClient.set.mockResolvedValue(null);
     const result = await RedisService.acquireLock("lock:2", 10);
     expect(result).toBe(false);
-    expect(mockClient.expire).not.toHaveBeenCalled();
+  });
+
+  it("releaseLock calls eval with script, keys and token", async () => {
+    mockClient.eval.mockResolvedValue(1);
+    await RedisService.releaseLock("lock:3", "my-token");
+    expect(mockClient.eval).toHaveBeenCalledWith(
+      expect.stringContaining("redis.call('get'"),
+      { keys: ["lock:3"], arguments: ["my-token"] },
+    );
   });
 });

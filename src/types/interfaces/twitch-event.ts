@@ -7,7 +7,7 @@ import {
 export interface TwitchEvent {
   id: string;
   timestamp: string;
-  version: string;
+  version?: string;
   source: string;
   type: string;
   channelId?: string;

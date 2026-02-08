@@ -55,7 +55,7 @@ describe("EventController", () => {
     );
   });
 
-  it("returns 400 for event missing required fields", async () => {
+  it("returns 500 for event missing required fields", async () => {
     req.body = [{ id: "e1", type: "message" }];
     await EventController.handleEvent(req as Request, res as Response);
     expect(statusMock).toHaveBeenCalledWith(500);

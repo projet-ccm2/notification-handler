@@ -90,13 +90,15 @@ describe("RedisService (Testcontainers)", () => {
 
   it("acquireLock and releaseLock", async () => {
     const lockKey = "lock:test:lock1";
-    const acquired1 = await RedisService.acquireLock(lockKey, 10);
-    expect(acquired1).toBe(true);
+    const token1 = await RedisService.acquireLock(lockKey, 10);
+    expect(typeof token1).toBe("string");
+    if (typeof token1 !== "string") return;
     const acquired2 = await RedisService.acquireLock(lockKey, 10);
     expect(acquired2).toBe(false);
-    await RedisService.releaseLock(lockKey);
-    const acquired3 = await RedisService.acquireLock(lockKey, 10);
-    expect(acquired3).toBe(true);
-    await RedisService.releaseLock(lockKey);
+    await RedisService.releaseLock(lockKey, token1);
+    const token3 = await RedisService.acquireLock(lockKey, 10);
+    expect(typeof token3).toBe("string");
+    if (typeof token3 !== "string") return;
+    await RedisService.releaseLock(lockKey, token3);
   });
 });

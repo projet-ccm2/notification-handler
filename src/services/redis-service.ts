@@ -1,6 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { createClient, RedisClientType } from "redis";
 import { config } from "../config/environment";
 import { logger } from "../utils/logger";
+
+const RELEASE_LOCK_SCRIPT =
+  "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
 
 export class RedisService {
   private static client: RedisClientType | null = null;
@@ -64,8 +68,21 @@ export class RedisService {
     await this.execute((c) => c.del(key));
   }
 
+  private static async scanKeys(pattern: string): Promise<string[]> {
+    return this.execute(async (client) => {
+      const keys: string[] = [];
+      for await (const key of client.scanIterator({
+        MATCH: pattern,
+        COUNT: 100,
+      })) {
+        keys.push(key);
+      }
+      return keys;
+    });
+  }
+
   static async getKeysByPattern(pattern: string): Promise<string[]> {
-    return this.execute((c) => c.keys(pattern));
+    return this.scanKeys(pattern);
   }
 
   static async exists(key: string): Promise<boolean> {
@@ -124,7 +141,7 @@ export class RedisService {
     cacheKey: string,
   ): Promise<Array<{ userId: string; achievementId: string; data: unknown }>> {
     const pattern = `sync:data:${cacheKey}:*`;
-    const keys = await this.execute((c) => c.keys(pattern));
+    const keys = await this.scanKeys(pattern);
     const syncDataArray = [];
 
     for (const key of keys) {
@@ -137,22 +154,24 @@ export class RedisService {
 
   static async deleteAllSyncDataForCacheKey(cacheKey: string): Promise<void> {
     const pattern = `sync:data:${cacheKey}:*`;
-    const keys = await this.execute((c) => c.keys(pattern));
+    const keys = await this.scanKeys(pattern);
     if (keys.length > 0) await this.execute((c) => c.del(keys));
   }
 
   static async acquireLock(
     lockKey: string,
     ttlSeconds: number = 10,
-  ): Promise<boolean> {
-    const result = await this.execute((c) => c.setNX(lockKey, "1"));
-    if (result) {
-      await this.execute((c) => c.expire(lockKey, ttlSeconds));
-    }
-    return result;
+  ): Promise<string | false> {
+    const token = randomUUID();
+    const result = await this.execute((c) =>
+      c.set(lockKey, token, { NX: true, EX: ttlSeconds }),
+    );
+    return result === "OK" ? token : false;
   }
 
-  static async releaseLock(lockKey: string): Promise<void> {
-    await this.execute((c) => c.del(lockKey));
+  static async releaseLock(lockKey: string, token: string): Promise<void> {
+    await this.execute((c) =>
+      c.eval(RELEASE_LOCK_SCRIPT, { keys: [lockKey], arguments: [token] }),
+    );
   }
 }
