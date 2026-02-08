@@ -196,4 +196,21 @@ export class CacheDbService {
       }
     }
   }
+
+  static async clearCacheByChannelId(channelId: string): Promise<void> {
+    const achievementsKey = this.buildAchievementsCacheKey(channelId);
+    await RedisService.delete(achievementsKey);
+
+    const userAchievedPattern = `${this.CACHE_PREFIX_USER_ACHIEVED}*:${channelId}`;
+    const userAchievedKeys = await RedisService.getKeysByPattern(userAchievedPattern);
+
+    for (const cacheKey of userAchievedKeys) {
+      await RedisService.removeFromSyncSet(cacheKey);
+      await RedisService.deleteAllSyncDataForCacheKey(cacheKey);
+      await RedisService.delete(`read:lock:${cacheKey}`);
+      await RedisService.delete(`lock:${cacheKey}`);
+      await RedisService.delete(`sync:lock:${cacheKey}`);
+      await RedisService.delete(cacheKey);
+    }
+  }
 }

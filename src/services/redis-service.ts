@@ -54,6 +54,10 @@ export class RedisService {
     await this.execute((c) => c.del(key));
   }
 
+  static async getKeysByPattern(pattern: string): Promise<string[]> {
+    return this.execute((c) => c.keys(pattern));
+  }
+
   static async exists(key: string): Promise<boolean> {
     return (await this.execute((c) => c.exists(key))) === 1;
   }

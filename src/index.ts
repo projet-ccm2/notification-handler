@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import { config } from "./config/environment";
 import { logger } from "./utils/logger";
 import eventRoutes from "./routes/event-routes";
+import cacheRoutes from "./routes/cache-routes";
 import { RedisService } from "./services";
 
 const app = express();
@@ -17,6 +18,7 @@ app.get("/health", (req: Request, res: Response) => {
 });
 
 app.use("/", eventRoutes);
+app.use("/cache", cacheRoutes);
 
 if (config.nodeEnv !== "test") {
   const server = app.listen(config.port, async () => {

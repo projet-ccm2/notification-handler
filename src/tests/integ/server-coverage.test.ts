@@ -43,7 +43,7 @@ describe("Server Coverage Tests", () => {
       use: jest.fn().mockReturnThis(),
     };
 
-    const mockRouter = { post: jest.fn().mockReturnThis(), get: jest.fn().mockReturnThis(), use: jest.fn().mockReturnThis() };
+    const mockRouter = { post: jest.fn().mockReturnThis(), get: jest.fn().mockReturnThis(), delete: jest.fn().mockReturnThis(), use: jest.fn().mockReturnThis() };
     const expressFn = jest.fn(() => mockApp);
     (expressFn as any).json = jest.fn();
     jest.doMock("express", () => ({
