@@ -3,7 +3,12 @@ import { RedisService } from "../../../services/redis-service";
 import { UserAchievement } from "../../../types/classes/user-achievement";
 
 jest.mock("../../../utils/logger", () => ({
-  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() },
+  logger: {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+  },
 }));
 
 jest.mock("../../../services/redis-service");
@@ -52,7 +57,11 @@ describe("CacheDbService branches", () => {
         .mockResolvedValueOnce(achieved);
       Redis.acquireLock.mockResolvedValue(false);
 
-      const result = await CacheDbService.getAchievements("ch1", "u1", "points");
+      const result = await CacheDbService.getAchievements(
+        "ch1",
+        "u1",
+        "points",
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("a1");
@@ -89,7 +98,11 @@ describe("CacheDbService branches", () => {
       Redis.acquireLock.mockResolvedValue(true);
       Redis.releaseLock.mockResolvedValue(undefined);
 
-      const result = await CacheDbService.getAchievements("ch2", "u1", "points");
+      const result = await CacheDbService.getAchievements(
+        "ch2",
+        "u1",
+        "points",
+      );
 
       expect(result).toHaveLength(1);
       expect(DbService.getUserAchievements).not.toHaveBeenCalled();
@@ -108,7 +121,9 @@ describe("CacheDbService branches", () => {
 
       await CacheDbService.refreshExpiredCacheEntries();
 
-      expect(Redis.removeFromSyncSet).toHaveBeenCalledWith("user_achieved:u1:ch1");
+      expect(Redis.removeFromSyncSet).toHaveBeenCalledWith(
+        "user_achieved:u1:ch1",
+      );
       expect(DbService.putAchieved).not.toHaveBeenCalled();
     });
 
@@ -121,7 +136,12 @@ describe("CacheDbService branches", () => {
         {
           userId: "u2",
           achievementId: "a2",
-          data: { count: 5, finished: true, labelActive: false, acquiredDate: "2025-01-01" },
+          data: {
+            count: 5,
+            finished: true,
+            labelActive: false,
+            acquiredDate: "2025-01-01",
+          },
         },
       ]);
       Redis.deleteAllSyncDataForCacheKey.mockResolvedValue(undefined);
@@ -137,10 +157,14 @@ describe("CacheDbService branches", () => {
           userId: "u2",
           count: 5,
           finished: true,
-        })
+        }),
       );
-      expect(Redis.deleteAllSyncDataForCacheKey).toHaveBeenCalledWith("user_achieved:u2:ch2");
-      expect(Redis.removeFromSyncSet).toHaveBeenCalledWith("user_achieved:u2:ch2");
+      expect(Redis.deleteAllSyncDataForCacheKey).toHaveBeenCalledWith(
+        "user_achieved:u2:ch2",
+      );
+      expect(Redis.removeFromSyncSet).toHaveBeenCalledWith(
+        "user_achieved:u2:ch2",
+      );
     });
 
     it("skips when lock not acquired", async () => {
@@ -170,11 +194,18 @@ describe("CacheDbService branches", () => {
       Redis.getPendingSyncKeys.mockResolvedValue(["user_achieved:u5:ch5"]);
       Redis.acquireLock.mockResolvedValue(true);
       Redis.getTtl.mockResolvedValue(-1);
-      Redis.exists
-        .mockResolvedValueOnce(false)
-        .mockResolvedValueOnce(true);
+      Redis.exists.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
       Redis.getAllSyncDataForCacheKey.mockResolvedValue([
-        { userId: "u5", achievementId: "a5", data: { count: 1, finished: false, labelActive: false, acquiredDate: "" } },
+        {
+          userId: "u5",
+          achievementId: "a5",
+          data: {
+            count: 1,
+            finished: false,
+            labelActive: false,
+            acquiredDate: "",
+          },
+        },
       ]);
       Redis.deleteAllSyncDataForCacheKey.mockResolvedValue(undefined);
       Redis.removeFromSyncSet.mockResolvedValue(undefined);
@@ -199,11 +230,20 @@ describe("CacheDbService branches", () => {
         1,
         "L",
         null,
-        { achievementId: "a1", userId: "u1", count: 0, finished: false, labelActive: false, acquiredDate: "" },
-        "ch1"
+        {
+          achievementId: "a1",
+          userId: "u1",
+          count: 0,
+          finished: false,
+          labelActive: false,
+          acquiredDate: "",
+        },
+        "ch1",
       );
 
-      await expect(CacheDbService.update(u)).rejects.toThrow("Failed to acquire lock");
+      await expect(CacheDbService.update(u)).rejects.toThrow(
+        "Failed to acquire lock",
+      );
       expect(Redis.acquireLock).toHaveBeenCalledTimes(10);
     });
 
@@ -250,7 +290,7 @@ describe("CacheDbService branches", () => {
         "L",
         { id: "t1", label: "points", data: "{}" },
         achievedItem,
-        "ch1"
+        "ch1",
       );
 
       await CacheDbService.update(u);

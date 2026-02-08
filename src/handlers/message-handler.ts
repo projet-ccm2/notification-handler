@@ -1,5 +1,4 @@
-import type { TwitchEvent } from "../types";
-import type { MessagePayload } from "../types";
+import type { TwitchEvent, MessagePayload } from "../types";
 import { logger } from "../utils/logger";
 
 export class MessageHandler {
@@ -11,8 +10,5 @@ export class MessageHandler {
       user: event.userLogin,
       message: payload.message,
     });
-
-
   }
 }
-

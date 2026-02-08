@@ -69,7 +69,9 @@ describe("RedisService (Testcontainers)", () => {
     const keys = await RedisService.getPendingSyncKeys();
     expect(keys).toContain("user_achieved:u1:ch1");
     await RedisService.removeFromSyncSet("user_achieved:u1:ch1");
-    expect(await RedisService.getPendingSyncKeys()).not.toContain("user_achieved:u1:ch1");
+    expect(await RedisService.getPendingSyncKeys()).not.toContain(
+      "user_achieved:u1:ch1",
+    );
   });
 
   it("storeSyncData and getAllSyncDataForCacheKey", async () => {

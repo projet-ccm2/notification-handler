@@ -19,7 +19,10 @@ export class CacheDbService {
   }
 
   /** Cache key for user achieved list on a channel. */
-  private static buildUserAchievedCacheKey(userId: string, channelId: string): string {
+  private static buildUserAchievedCacheKey(
+    userId: string,
+    channelId: string,
+  ): string {
     return `${this.CACHE_PREFIX_USER_ACHIEVED}${userId}:${channelId}`;
   }
 
@@ -28,32 +31,33 @@ export class CacheDbService {
     definitions: AchievementWithType[],
     achievedList: Achieved[],
     channelId: string,
-    typeAchievementLabel: string
+    typeAchievementLabel: string,
   ): UserAchievement[] {
     const achievedByAchievementId = new Map<string, Achieved>(
-      achievedList.map((a) => [a.achievementId, a])
+      achievedList.map((a) => [a.achievementId, a]),
     );
     const merged = definitions.map((def) =>
       UserAchievement.fromMerged(
         def,
         achievedByAchievementId.get(def.id) ?? null,
-        channelId
-      )
+        channelId,
+      ),
     );
     return merged.filter(
-      (u) => u.typeAchievement?.label === typeAchievementLabel
+      (u) => u.typeAchievement?.label === typeAchievementLabel,
     );
   }
 
   static async getAchievements(
     channelId: string,
     userId: string,
-    typeAchievement: string
+    typeAchievement: string,
   ): Promise<UserAchievement[]> {
     const cacheKeyAchievements = this.buildAchievementsCacheKey(channelId);
     const cacheKeyUser = this.buildUserAchievedCacheKey(userId, channelId);
 
-    const cachedDefs = await RedisService.get<AchievementWithType[]>(cacheKeyAchievements);
+    const cachedDefs =
+      await RedisService.get<AchievementWithType[]>(cacheKeyAchievements);
     const cachedAchieved = await RedisService.get<Achieved[]>(cacheKeyUser);
 
     if (cachedDefs && cachedAchieved !== null) {
@@ -61,7 +65,7 @@ export class CacheDbService {
         cachedDefs,
         cachedAchieved,
         channelId,
-        typeAchievement
+        typeAchievement,
       );
     }
 
@@ -69,21 +73,36 @@ export class CacheDbService {
     const lockAcquired = await RedisService.acquireLock(lockKey, 10);
     if (!lockAcquired) {
       await new Promise((resolve) => setTimeout(resolve, 100));
-      const retryDefs = await RedisService.get<AchievementWithType[]>(cacheKeyAchievements);
+      const retryDefs =
+        await RedisService.get<AchievementWithType[]>(cacheKeyAchievements);
       const retryAchieved = await RedisService.get<Achieved[]>(cacheKeyUser);
       if (retryDefs && retryAchieved !== null) {
-        return this.mergeAndFilter(retryDefs, retryAchieved, channelId, typeAchievement);
+        return this.mergeAndFilter(
+          retryDefs,
+          retryAchieved,
+          channelId,
+          typeAchievement,
+        );
       }
     }
 
     try {
-      const defsAgain = await RedisService.get<AchievementWithType[]>(cacheKeyAchievements);
+      const defsAgain =
+        await RedisService.get<AchievementWithType[]>(cacheKeyAchievements);
       const achievedAgain = await RedisService.get<Achieved[]>(cacheKeyUser);
       if (defsAgain && achievedAgain !== null) {
-        return this.mergeAndFilter(defsAgain, achievedAgain, channelId, typeAchievement);
+        return this.mergeAndFilter(
+          defsAgain,
+          achievedAgain,
+          channelId,
+          typeAchievement,
+        );
       }
 
-      const apiResponse = await DbService.getUserAchievements(userId, channelId);
+      const apiResponse = await DbService.getUserAchievements(
+        userId,
+        channelId,
+      );
       const definitions: AchievementWithType[] = apiResponse.map((item) => ({
         id: item.id,
         title: item.title,
@@ -100,7 +119,12 @@ export class CacheDbService {
       await RedisService.set(cacheKeyAchievements, definitions, this.CACHE_TTL);
       await RedisService.set(cacheKeyUser, achievedList, this.CACHE_TTL);
 
-      return this.mergeAndFilter(definitions, achievedList, channelId, typeAchievement);
+      return this.mergeAndFilter(
+        definitions,
+        achievedList,
+        channelId,
+        typeAchievement,
+      );
     } finally {
       if (lockAcquired) await RedisService.releaseLock(lockKey);
     }
@@ -109,7 +133,8 @@ export class CacheDbService {
   /** Updates only the achieved part in cache; marks for sync to DB on expiry. */
   static async update(userAchievement: UserAchievement): Promise<void> {
     const userId = userAchievement.achieved?.userId;
-    if (!userId) throw new Error("UserAchievement.achieved is required for update");
+    if (!userId)
+      throw new Error("UserAchievement.achieved is required for update");
     const channelId = userAchievement.channelId;
     const cacheKey = this.buildUserAchievedCacheKey(userId, channelId);
     const lockKey = `lock:${cacheKey}`;
@@ -131,7 +156,9 @@ export class CacheDbService {
         }
 
         const updated = userAchievement.toCacheAchieved();
-        const idx = achievedList.findIndex((a) => a.achievementId === userAchievement.id);
+        const idx = achievedList.findIndex(
+          (a) => a.achievementId === userAchievement.id,
+        );
         const newList =
           idx >= 0
             ? achievedList.map((a, i) => (i === idx ? updated : a))
@@ -155,7 +182,9 @@ export class CacheDbService {
       }
     }
 
-    throw new Error(`Failed to acquire lock for cacheKey: ${cacheKey} after 10 attempts`);
+    throw new Error(
+      `Failed to acquire lock for cacheKey: ${cacheKey} after 10 attempts`,
+    );
   }
 
   static async refreshExpiredCacheEntries(): Promise<void> {
@@ -173,7 +202,8 @@ export class CacheDbService {
 
         if (ttl > 0 && exists) continue;
 
-        const syncDataList = await RedisService.getAllSyncDataForCacheKey(cacheKey);
+        const syncDataList =
+          await RedisService.getAllSyncDataForCacheKey(cacheKey);
 
         if (syncDataList.length === 0) {
           await RedisService.removeFromSyncSet(cacheKey);
@@ -190,7 +220,8 @@ export class CacheDbService {
 
         await RedisService.deleteAllSyncDataForCacheKey(cacheKey);
         await RedisService.removeFromSyncSet(cacheKey);
-        if (await RedisService.exists(cacheKey)) await RedisService.delete(cacheKey);
+        if (await RedisService.exists(cacheKey))
+          await RedisService.delete(cacheKey);
       } finally {
         await RedisService.releaseLock(lockKey);
       }
@@ -202,7 +233,8 @@ export class CacheDbService {
     await RedisService.delete(achievementsKey);
 
     const userAchievedPattern = `${this.CACHE_PREFIX_USER_ACHIEVED}*:${channelId}`;
-    const userAchievedKeys = await RedisService.getKeysByPattern(userAchievedPattern);
+    const userAchievedKeys =
+      await RedisService.getKeysByPattern(userAchievedPattern);
 
     for (const cacheKey of userAchievedKeys) {
       await RedisService.removeFromSyncSet(cacheKey);

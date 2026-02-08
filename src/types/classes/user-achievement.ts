@@ -15,10 +15,13 @@ export class UserAchievement {
     public readonly label: string,
     public readonly typeAchievement: TypeAchievement | null,
     public readonly achieved: Achieved | null,
-    public readonly channelId: string
+    public readonly channelId: string,
   ) {}
 
-  static fromApi(item: ApiUserAchievementItem, channelId: string): UserAchievement {
+  static fromApi(
+    item: ApiUserAchievementItem,
+    channelId: string,
+  ): UserAchievement {
     return new UserAchievement(
       item.id,
       item.title,
@@ -28,14 +31,14 @@ export class UserAchievement {
       item.label,
       item.typeAchievement,
       item.achieved,
-      channelId
+      channelId,
     );
   }
 
   static fromMerged(
     achievement: AchievementWithType,
     achieved: Achieved | null,
-    channelId: string
+    channelId: string,
   ): UserAchievement {
     return new UserAchievement(
       achievement.id,
@@ -46,13 +49,15 @@ export class UserAchievement {
       achievement.label,
       achievement.typeAchievement,
       achieved,
-      channelId
+      channelId,
     );
   }
 
   toCacheAchieved(): Achieved {
     if (!this.achieved) {
-      throw new Error("UserAchievement.toCacheAchieved requires achieved to be set");
+      throw new Error(
+        "UserAchievement.toCacheAchieved requires achieved to be set",
+      );
     }
     return this.achieved;
   }

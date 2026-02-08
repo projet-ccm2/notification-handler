@@ -5,29 +5,30 @@
 GET dans cache-db-service
 j'ai une seul methode get qui a pour paramettre idChannel, idUser et typeAchievement (que des string)
 
-et ça retourne un tableau de ça (et ça serai le type userAchievement): 
+et ça retourne un tableau de ça (et ça serai le type userAchievement):
+
 ```json
-    {
-      "id": "uuid",
-      "title": "string",
-      "description": "string",
-      "goal": 1,
-      "reward": 2,
-      "label": "string",
-      "typeAchievement": {
-        "id": "uuid",
-        "label": "string",
-        "data": "string"
-      },
-      "achieved": {
-        "achievementId": "uuid",
-        "userId": "uuid",
-        "count": 1,
-        "finished": false,
-        "labelActive": true,
-        "acquiredDate": "2024-01-01T00:00:00.000Z"
-      }
-    }
+{
+  "id": "uuid",
+  "title": "string",
+  "description": "string",
+  "goal": 1,
+  "reward": 2,
+  "label": "string",
+  "typeAchievement": {
+    "id": "uuid",
+    "label": "string",
+    "data": "string"
+  },
+  "achieved": {
+    "achievementId": "uuid",
+    "userId": "uuid",
+    "count": 1,
+    "finished": false,
+    "labelActive": true,
+    "acquiredDate": "2024-01-01T00:00:00.000Z"
+  }
+}
 ```
 
 1 - premierement tu dois check si ça existe pas en cache
@@ -36,10 +37,10 @@ et ça retourne un tableau de ça (et ça serai le type userAchievement):
 
 2-a - ça existe dans le cache tu map les donnée (celon comment elles ont été stock) pour retourné la valeur
 
-2-b - ça n'existe pas et tu dois les get depuis un api 
+2-b - ça n'existe pas et tu dois les get depuis un api
 https://github.com/projet-ccm2/DB-gateway/blob/feat/database-setup-clean/doc/achievements.md
 
-GET /achievements/user/:userId/channel/:channelId 
+GET /achievements/user/:userId/channel/:channelId
 pour recup l'avancement sur un succès
 
 GET /achievements/channel/:channelId

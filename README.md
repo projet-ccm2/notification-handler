@@ -25,25 +25,25 @@ cp .env.example .env
 
 ## Environment variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Server port | `3000` |
-| `NODE_ENV` | `development` / `production` / `test` | `development` |
-| `ALLOWED_ORIGINS` | CORS origins (comma-separated) | `http://localhost:3000,http://localhost:8080` |
-| `DB_GATEWAY_BASE_URL` | DB gateway base URL (achievements) | `http://localhost:8080` |
-| `REDIS_URL` | Redis URL | `redis://localhost:6379` |
-| `CACHE_TTL` | Cache TTL in seconds | `3600` |
+| Variable              | Description                           | Default                                       |
+| --------------------- | ------------------------------------- | --------------------------------------------- |
+| `PORT`                | Server port                           | `3000`                                        |
+| `NODE_ENV`            | `development` / `production` / `test` | `development`                                 |
+| `ALLOWED_ORIGINS`     | CORS origins (comma-separated)        | `http://localhost:3000,http://localhost:8080` |
+| `DB_GATEWAY_BASE_URL` | DB gateway base URL (achievements)    | `http://localhost:8080`                       |
+| `REDIS_URL`           | Redis URL                             | `redis://localhost:6379`                      |
+| `CACHE_TTL`           | Cache TTL in seconds                  | `3600`                                        |
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start the server in dev (`ts-node`) |
-| `npm run build` | Compile TypeScript |
-| `npm start` | Start the server (after `build`) |
-| `npm test` | Run tests and coverage |
+| Command                 | Description                             |
+| ----------------------- | --------------------------------------- |
+| `npm run dev`           | Start the server in dev (`ts-node`)     |
+| `npm run build`         | Compile TypeScript                      |
+| `npm start`             | Start the server (after `build`)        |
+| `npm test`              | Run tests and coverage                  |
 | `npm run test:coverage` | Run tests with detailed coverage report |
-| `npm run test:ci` | Run tests in CI mode |
+| `npm run test:ci`       | Run tests in CI mode                    |
 
 ---
 
@@ -84,18 +84,18 @@ Submit a batch of Twitch events. Each event must have `id`, `type`, `source`, an
 
 **TwitchEvent**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `id` | string | yes | Event identifier |
-| `type` | string | yes | Type (e.g. `message`, `channel.channel_points_custom_reward_redemption.add`, `channel.channel_points_automatic_reward_redemption.add`) |
-| `source` | string | yes | Event source |
-| `timestamp` | string | yes | Date/time (e.g. ISO 8601) |
-| `version` | string | no | Payload version |
-| `channelId` | string | no | Channel ID |
-| `channelLogin` | string | no | Channel login |
-| `userId` | string | no | User ID |
-| `userLogin` | string | no | User login |
-| `payload` | object | yes | Payload per type (message, channel points, etc.) |
+| Field          | Type   | Required | Description                                                                                                                            |
+| -------------- | ------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`           | string | yes      | Event identifier                                                                                                                       |
+| `type`         | string | yes      | Type (e.g. `message`, `channel.channel_points_custom_reward_redemption.add`, `channel.channel_points_automatic_reward_redemption.add`) |
+| `source`       | string | yes      | Event source                                                                                                                           |
+| `timestamp`    | string | yes      | Date/time (e.g. ISO 8601)                                                                                                              |
+| `version`      | string | no       | Payload version                                                                                                                        |
+| `channelId`    | string | no       | Channel ID                                                                                                                             |
+| `channelLogin` | string | no       | Channel login                                                                                                                          |
+| `userId`       | string | no       | User ID                                                                                                                                |
+| `userLogin`    | string | no       | User login                                                                                                                             |
+| `payload`      | object | yes      | Payload per type (message, channel points, etc.)                                                                                       |
 
 **Example body (message)**
 
@@ -229,8 +229,8 @@ Clears all cache for a channel: channel achievement definitions and all users’
 
 **Path parameters**
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name        | Type   | Description                                     |
+| ----------- | ------ | ----------------------------------------------- |
 | `channelId` | string | ID of the channel whose cache should be cleared |
 
 **Responses**

@@ -58,12 +58,24 @@ describe("UserAchievement", () => {
       labelActive: false,
       acquiredDate: "",
     };
-    const u = new UserAchievement("a3", "T", "D", 1, 1, "L", null, achieved, "ch3");
+    const u = new UserAchievement(
+      "a3",
+      "T",
+      "D",
+      1,
+      1,
+      "L",
+      null,
+      achieved,
+      "ch3",
+    );
     expect(u.toCacheAchieved()).toEqual(achieved);
   });
 
   it("toCacheAchieved throws when achieved is null", () => {
     const u = new UserAchievement("a4", "T", "D", 1, 1, "L", null, null, "ch4");
-    expect(() => u.toCacheAchieved()).toThrow("UserAchievement.toCacheAchieved requires achieved to be set");
+    expect(() => u.toCacheAchieved()).toThrow(
+      "UserAchievement.toCacheAchieved requires achieved to be set",
+    );
   });
 });

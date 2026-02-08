@@ -36,7 +36,7 @@ describe("DbService", () => {
     expect(result).toEqual(data);
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining("/achievements/channel/ch1"),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
@@ -66,7 +66,7 @@ describe("DbService", () => {
     expect(result).toEqual(res.achievements);
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining("/achievements/user/u1/channel/ch1"),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
@@ -87,17 +87,25 @@ describe("DbService", () => {
       expect.objectContaining({
         method: "PUT",
         body: expect.any(String),
-      })
+      }),
     );
   });
 
   it("getAchievements throws when response not ok", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 500, statusText: "Server Error" });
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: "Server Error",
+    });
     await expect(DbService.getAchievements("ch1")).rejects.toThrow("HTTP 500");
   });
 
   it("putAchieved throws when response not ok", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 404, statusText: "Not Found" });
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+    });
     await expect(
       DbService.putAchieved({
         achievementId: "a1",
@@ -106,7 +114,7 @@ describe("DbService", () => {
         finished: false,
         labelActive: false,
         acquiredDate: "",
-      })
+      }),
     ).rejects.toThrow("HTTP 404");
   });
 });

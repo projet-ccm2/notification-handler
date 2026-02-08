@@ -62,7 +62,10 @@ describe("POST /events", () => {
   });
 
   it("returns 400 when array is empty", async () => {
-    const response = await request(app).post("/events").send([]).set("Content-Type", "application/json");
+    const response = await request(app)
+      .post("/events")
+      .send([])
+      .set("Content-Type", "application/json");
 
     expect(response.status).toBe(400);
     expect(response.body.message).toContain("empty");

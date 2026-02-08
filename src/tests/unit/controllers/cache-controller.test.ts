@@ -37,7 +37,9 @@ describe("CacheController", () => {
   describe("clearChannelCache", () => {
     it("returns 204 and calls clearCacheByChannelId when channelId is set", async () => {
       req.params = { channelId: "ch1" };
-      (CacheDbService.clearCacheByChannelId as jest.Mock).mockResolvedValue(undefined);
+      (CacheDbService.clearCacheByChannelId as jest.Mock).mockResolvedValue(
+        undefined,
+      );
 
       await CacheController.clearChannelCache(req as Request, res as Response);
 
@@ -71,7 +73,7 @@ describe("CacheController", () => {
     it("returns 500 and logs when clearCacheByChannelId throws", async () => {
       req.params = { channelId: "ch2" };
       (CacheDbService.clearCacheByChannelId as jest.Mock).mockRejectedValue(
-        new Error("Redis down")
+        new Error("Redis down"),
       );
 
       await CacheController.clearChannelCache(req as Request, res as Response);

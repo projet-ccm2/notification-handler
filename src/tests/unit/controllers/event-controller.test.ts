@@ -40,7 +40,7 @@ describe("EventController", () => {
       expect.objectContaining({
         error: "Invalid request body",
         message: "Expected an array of events",
-      })
+      }),
     );
   });
 
@@ -51,7 +51,7 @@ describe("EventController", () => {
     expect(jsonMock).toHaveBeenCalledWith(
       expect.objectContaining({
         message: "Events array cannot be empty",
-      })
+      }),
     );
   });
 
@@ -69,7 +69,7 @@ describe("EventController", () => {
             error: "Missing required fields: id, type, source, or timestamp",
           }),
         ]),
-      })
+      }),
     );
   });
 
@@ -92,7 +92,7 @@ describe("EventController", () => {
         processed: 1,
         failed: 0,
         results: [{ eventId: "e1", status: "success" }],
-      })
+      }),
     );
   });
 
@@ -129,7 +129,7 @@ describe("EventController", () => {
             error: "Handler error",
           }),
         ]),
-      })
+      }),
     );
   });
 
@@ -143,14 +143,16 @@ describe("EventController", () => {
         payload: {},
       },
     ];
-    (EventHandler.handleEvent as jest.Mock).mockRejectedValue(new Error("Fail"));
+    (EventHandler.handleEvent as jest.Mock).mockRejectedValue(
+      new Error("Fail"),
+    );
     await EventController.handleEvent(req as Request, res as Response);
     expect(statusMock).toHaveBeenCalledWith(500);
     expect(jsonMock).toHaveBeenCalledWith(
       expect.objectContaining({
         status: "partial",
         failed: 1,
-      })
+      }),
     );
   });
 
@@ -162,7 +164,7 @@ describe("EventController", () => {
       expect.objectContaining({
         error: "Internal server error",
         message: "Failed to process events",
-      })
+      }),
     );
   });
 });

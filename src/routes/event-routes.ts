@@ -6,4 +6,3 @@ const router = Router();
 router.post("/events", EventController.handleEvent);
 
 export default router;
-

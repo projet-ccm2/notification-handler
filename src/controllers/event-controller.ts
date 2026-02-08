@@ -3,14 +3,18 @@ import { TwitchEvent } from "../types";
 import { EventHandler } from "../handlers/event-handler";
 import { logger } from "../utils/logger";
 
-function computeStatusCode(processed: number, failed: number, total: number): number {
+function computeStatusCode(
+  processed: number,
+  failed: number,
+  total: number,
+): number {
   if (failed === 0) return 200;
   if (failed === total) return 500;
   return 207;
 }
 
 function processEvent(
-  event: TwitchEvent
+  event: TwitchEvent,
 ): { eventId: string; status: "success" } | { eventId: string; error: string } {
   if (!event.id || !event.type || !event.source || !event.timestamp) {
     return {
@@ -63,7 +67,11 @@ export class EventController {
         }
       }
 
-      const statusCode = computeStatusCode(results.length, errors.length, events.length);
+      const statusCode = computeStatusCode(
+        results.length,
+        errors.length,
+        events.length,
+      );
 
       res.status(statusCode).json({
         status: errors.length === 0 ? "success" : "partial",
@@ -84,4 +92,3 @@ export class EventController {
     }
   }
 }
-

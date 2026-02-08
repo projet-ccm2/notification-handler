@@ -61,25 +61,44 @@ describe("CacheDbService (Testcontainers Redis)", () => {
   describe("getAchievements", () => {
     it("returns achievements from DB and caches them when cache miss", async () => {
       const DbService = await import("../../services/db-service");
-      jest.spyOn(DbService.DbService, "getUserAchievements").mockResolvedValueOnce(mockAchievementsFromApi);
+      jest
+        .spyOn(DbService.DbService, "getUserAchievements")
+        .mockResolvedValueOnce(mockAchievementsFromApi);
 
-      const result = await CacheDbService.getAchievements("ch1", "user1", "points");
+      const result = await CacheDbService.getAchievements(
+        "ch1",
+        "user1",
+        "points",
+      );
 
       expect(result).toHaveLength(2);
       expect(result[0].id).toBe("ach1");
       expect(result[0].channelId).toBe("ch1");
-      expect(DbService.DbService.getUserAchievements).toHaveBeenCalledWith("user1", "ch1");
+      expect(DbService.DbService.getUserAchievements).toHaveBeenCalledWith(
+        "user1",
+        "ch1",
+      );
 
-      const fromCache = await CacheDbService.getAchievements("ch1", "user1", "points");
+      const fromCache = await CacheDbService.getAchievements(
+        "ch1",
+        "user1",
+        "points",
+      );
       expect(fromCache).toHaveLength(2);
       expect(DbService.DbService.getUserAchievements).toHaveBeenCalledTimes(1);
     });
 
     it("filters by typeAchievement label", async () => {
       const DbService = await import("../../services/db-service");
-      jest.spyOn(DbService.DbService, "getUserAchievements").mockResolvedValueOnce(mockAchievementsFromApi);
+      jest
+        .spyOn(DbService.DbService, "getUserAchievements")
+        .mockResolvedValueOnce(mockAchievementsFromApi);
 
-      const result = await CacheDbService.getAchievements("ch2", "user1", "other_label");
+      const result = await CacheDbService.getAchievements(
+        "ch2",
+        "user1",
+        "other_label",
+      );
       expect(result).toHaveLength(0);
     });
   });
@@ -87,10 +106,16 @@ describe("CacheDbService (Testcontainers Redis)", () => {
   describe("update", () => {
     it("updates cache and adds to sync set", async () => {
       const DbService = await import("../../services/db-service");
-      jest.spyOn(DbService.DbService, "getUserAchievements").mockResolvedValue(mockAchievementsFromApi);
+      jest
+        .spyOn(DbService.DbService, "getUserAchievements")
+        .mockResolvedValue(mockAchievementsFromApi);
 
       await CacheDbService.getAchievements("ch3", "user1", "points");
-      const list = await CacheDbService.getAchievements("ch3", "user1", "points");
+      const list = await CacheDbService.getAchievements(
+        "ch3",
+        "user1",
+        "points",
+      );
       const toUpdate = list[0];
       const updated = new UserAchievement(
         toUpdate.id,
@@ -105,14 +130,18 @@ describe("CacheDbService (Testcontainers Redis)", () => {
           count: 10,
           finished: true,
         },
-        "ch3"
+        "ch3",
       );
 
       await CacheDbService.update(updated);
 
       const keys = await RedisService.getPendingSyncKeys();
       expect(keys).toContain("user_achieved:user1:ch3");
-      const afterUpdate = await CacheDbService.getAchievements("ch3", "user1", "points");
+      const afterUpdate = await CacheDbService.getAchievements(
+        "ch3",
+        "user1",
+        "points",
+      );
       expect(afterUpdate[0].achieved?.count).toBe(10);
       expect(afterUpdate[0].achieved?.finished).toBe(true);
     });
@@ -127,10 +156,10 @@ describe("CacheDbService (Testcontainers Redis)", () => {
         "l",
         null,
         null,
-        "ch"
+        "ch",
       );
       await expect(CacheDbService.update(invalid)).rejects.toThrow(
-        "UserAchievement.achieved is required for update"
+        "UserAchievement.achieved is required for update",
       );
     });
   });
@@ -138,11 +167,15 @@ describe("CacheDbService (Testcontainers Redis)", () => {
   describe("refreshExpiredCacheEntries", () => {
     it("skips when cache key still has ttl", async () => {
       const DbService = await import("../../services/db-service");
-      jest.spyOn(DbService.DbService, "getUserAchievements").mockResolvedValue(mockAchievementsFromApi);
+      jest
+        .spyOn(DbService.DbService, "getUserAchievements")
+        .mockResolvedValue(mockAchievementsFromApi);
       jest.spyOn(DbService.DbService, "putAchieved").mockResolvedValue();
 
       await CacheDbService.getAchievements("ch4", "user1", "points");
-      const toUpdate = (await CacheDbService.getAchievements("ch4", "user1", "points"))[0];
+      const toUpdate = (
+        await CacheDbService.getAchievements("ch4", "user1", "points")
+      )[0];
       const updated = new UserAchievement(
         toUpdate.id,
         toUpdate.title,
@@ -152,7 +185,7 @@ describe("CacheDbService (Testcontainers Redis)", () => {
         toUpdate.label,
         toUpdate.typeAchievement,
         { ...toUpdate.achieved!, count: 1 },
-        "ch4"
+        "ch4",
       );
       await CacheDbService.update(updated);
 

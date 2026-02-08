@@ -47,7 +47,7 @@ describe("DELETE /cache/channel/:channelId", () => {
 
   it("returns 500 when clearCacheByChannelId throws", async () => {
     (CacheDbService.clearCacheByChannelId as jest.Mock).mockRejectedValueOnce(
-      new Error("Redis error")
+      new Error("Redis error"),
     );
 
     const response = await request(app).delete("/cache/channel/ch456");

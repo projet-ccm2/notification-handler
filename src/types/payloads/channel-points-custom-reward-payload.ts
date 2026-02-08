@@ -15,4 +15,3 @@ export interface ChannelPointsCustomRewardPayload {
     prompt: string;
   };
 }
-

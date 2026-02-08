@@ -10,7 +10,8 @@ const fetchJson = async <T>(url: string): Promise<T> => {
     method: "GET",
     headers: { "Content-Type": "application/json" },
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  if (!response.ok)
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   return response.json();
 };
 
@@ -20,22 +21,25 @@ const putJson = async (url: string, body: object): Promise<void> => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  if (!response.ok)
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 };
 
 export class DbService {
-  static async getAchievements(channelId: string): Promise<AchievementWithType[]> {
+  static async getAchievements(
+    channelId: string,
+  ): Promise<AchievementWithType[]> {
     return fetchJson<AchievementWithType[]>(
-      `${config.dbGateway.baseUrl}/achievements/channel/${channelId}`
+      `${config.dbGateway.baseUrl}/achievements/channel/${channelId}`,
     );
   }
 
   static async getUserAchievements(
     userId: string,
-    channelId: string
+    channelId: string,
   ): Promise<CachedUserAchievement[]> {
     const res = await fetchJson<UserAchievementsResponse>(
-      `${config.dbGateway.baseUrl}/achievements/user/${userId}/channel/${channelId}`
+      `${config.dbGateway.baseUrl}/achievements/user/${userId}/channel/${channelId}`,
     );
     return res.achievements;
   }
