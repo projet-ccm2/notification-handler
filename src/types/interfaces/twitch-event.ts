@@ -18,5 +18,5 @@ export interface TwitchEvent {
     | MessagePayload
     | ChannelPointsCustomRewardPayload
     | ChannelPointsAutomaticRewardPayload
-    | any;
+    | Record<string, unknown>;
 }

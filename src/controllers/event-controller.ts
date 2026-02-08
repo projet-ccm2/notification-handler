@@ -3,6 +3,24 @@ import { TwitchEvent } from "../types";
 import { EventHandler } from "../handlers/event-handler";
 import { logger } from "../utils/logger";
 
+function computeStatusCode(processed: number, failed: number, total: number): number {
+  if (failed === 0) return 200;
+  if (failed === total) return 500;
+  return 207;
+}
+
+function processEvent(
+  event: TwitchEvent
+): { eventId: string; status: "success" } | { eventId: string; error: string } {
+  if (!event.id || !event.type || !event.source || !event.timestamp) {
+    return {
+      eventId: event.id || "unknown",
+      error: "Missing required fields: id, type, source, or timestamp",
+    };
+  }
+  return { eventId: event.id, status: "success" };
+}
+
 export class EventController {
   static async handleEvent(req: Request, res: Response): Promise<void> {
     try {
@@ -24,24 +42,19 @@ export class EventController {
         return;
       }
 
-      const results = [];
-      const errors = [];
+      const results: Array<{ eventId: string; status: "success" }> = [];
+      const errors: Array<{ eventId: string; error: string }> = [];
 
       for (const event of events) {
-        if (!event.id || !event.type || !event.source || !event.timestamp) {
-          errors.push({
-            eventId: event.id || "unknown",
-            error: "Missing required fields: id, type, source, or timestamp",
-          });
+        const outcome = processEvent(event);
+        if ("error" in outcome) {
+          errors.push(outcome);
           continue;
         }
 
         try {
           await EventHandler.handleEvent(event);
-          results.push({
-            eventId: event.id,
-            status: "success",
-          });
+          results.push(outcome);
         } catch (error) {
           errors.push({
             eventId: event.id,
@@ -50,7 +63,7 @@ export class EventController {
         }
       }
 
-      const statusCode = errors.length === 0 ? 200 : errors.length === events.length ? 500 : 207;
+      const statusCode = computeStatusCode(results.length, errors.length, events.length);
 
       res.status(statusCode).json({
         status: errors.length === 0 ? "success" : "partial",
