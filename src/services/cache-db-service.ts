@@ -48,6 +48,19 @@ export class CacheDbService {
     );
   }
 
+  private static async tryGetFromCache(
+    cacheKeyAchievements: string,
+    cacheKeyUser: string,
+    channelId: string,
+    typeAchievement: string,
+  ): Promise<UserAchievement[] | null> {
+    const defs =
+      await RedisService.get<AchievementWithType[]>(cacheKeyAchievements);
+    const achieved = await RedisService.get<Achieved[]>(cacheKeyUser);
+    if (!defs || achieved === null) return null;
+    return this.mergeAndFilter(defs, achieved, channelId, typeAchievement);
+  }
+
   static async getAchievements(
     channelId: string,
     userId: string,
@@ -56,18 +69,13 @@ export class CacheDbService {
     const cacheKeyAchievements = this.buildAchievementsCacheKey(channelId);
     const cacheKeyUser = this.buildUserAchievedCacheKey(userId, channelId);
 
-    const cachedDefs =
-      await RedisService.get<AchievementWithType[]>(cacheKeyAchievements);
-    const cachedAchieved = await RedisService.get<Achieved[]>(cacheKeyUser);
-
-    if (cachedDefs && cachedAchieved !== null) {
-      return this.mergeAndFilter(
-        cachedDefs,
-        cachedAchieved,
-        channelId,
-        typeAchievement,
-      );
-    }
+    const cached = await this.tryGetFromCache(
+      cacheKeyAchievements,
+      cacheKeyUser,
+      channelId,
+      typeAchievement,
+    );
+    if (cached) return cached;
 
     const lockKey = `read:lock:${cacheKeyUser}`;
     const maxLockAttempts = 15;
@@ -80,70 +88,56 @@ export class CacheDbService {
       if (lockToken) break;
       const delay = Math.min(baseDelayMs * (attempt + 1), maxDelayMs);
       await new Promise((resolve) => setTimeout(resolve, delay));
-      const retryDefs =
-        await RedisService.get<AchievementWithType[]>(cacheKeyAchievements);
-      const retryAchieved = await RedisService.get<Achieved[]>(cacheKeyUser);
-      if (retryDefs && retryAchieved !== null) {
-        return this.mergeAndFilter(
-          retryDefs,
-          retryAchieved,
-          channelId,
-          typeAchievement,
-        );
-      }
+      const retry = await this.tryGetFromCache(
+        cacheKeyAchievements,
+        cacheKeyUser,
+        channelId,
+        typeAchievement,
+      );
+      if (retry) return retry;
     }
 
     if (!lockToken) {
-      const finalDefs =
-        await RedisService.get<AchievementWithType[]>(cacheKeyAchievements);
-      const finalAchieved = await RedisService.get<Achieved[]>(cacheKeyUser);
-      if (finalDefs && finalAchieved !== null) {
-        return this.mergeAndFilter(
-          finalDefs,
-          finalAchieved,
-          channelId,
-          typeAchievement,
-        );
-      }
-      return [];
+      const final = await this.tryGetFromCache(
+        cacheKeyAchievements,
+        cacheKeyUser,
+        channelId,
+        typeAchievement,
+      );
+      return final ?? [];
     }
 
     try {
-      const defsAgain =
-        await RedisService.get<AchievementWithType[]>(cacheKeyAchievements);
-      const achievedAgain = await RedisService.get<Achieved[]>(cacheKeyUser);
-      if (defsAgain && achievedAgain !== null) {
-        return this.mergeAndFilter(
-          defsAgain,
-          achievedAgain,
-          channelId,
-          typeAchievement,
-        );
-      }
+      const again = await this.tryGetFromCache(
+        cacheKeyAchievements,
+        cacheKeyUser,
+        channelId,
+        typeAchievement,
+      );
+      if (again) return again;
 
       const apiResponse = await DbService.getUserAchievements(
         userId,
         channelId,
       );
-      let definitions: AchievementWithType[];
-      let achievedList: Achieved[];
-      if (apiResponse.length === 0) {
-        definitions = await DbService.getAchievements(channelId);
-        achievedList = [];
-      } else {
-        definitions = apiResponse.map((item) => ({
-          id: item.id,
-          title: item.title,
-          description: item.description,
-          goal: item.goal,
-          reward: item.reward,
-          label: item.label,
-          typeAchievement: item.typeAchievement,
-        }));
-        achievedList = apiResponse
-          .map((item) => item.achieved)
-          .filter((a): a is Achieved => a !== null);
-      }
+      const definitions =
+        apiResponse.length === 0
+          ? await DbService.getAchievements(channelId)
+          : apiResponse.map((item) => ({
+              id: item.id,
+              title: item.title,
+              description: item.description,
+              goal: item.goal,
+              reward: item.reward,
+              label: item.label,
+              typeAchievement: item.typeAchievement,
+            }));
+      const achievedList =
+        apiResponse.length === 0
+          ? []
+          : apiResponse
+              .map((item) => item.achieved)
+              .filter((a): a is Achieved => a !== null);
 
       await RedisService.set(cacheKeyAchievements, definitions, this.CACHE_TTL);
       await RedisService.set(cacheKeyUser, achievedList, this.CACHE_TTL);
