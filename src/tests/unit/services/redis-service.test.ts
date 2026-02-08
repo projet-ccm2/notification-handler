@@ -133,10 +133,10 @@ describe("RedisService", () => {
   });
 
   it("deleteAllSyncDataForCacheKey does not call del when no keys", async () => {
-    async function* keyGen() {
-      if (false) yield "x";
+    async function* emptyKeyGen() {
+      /* no keys */
     }
-    mockClient.scanIterator.mockReturnValue(keyGen());
+    mockClient.scanIterator.mockReturnValue(emptyKeyGen());
     await RedisService.deleteAllSyncDataForCacheKey("ck");
     expect(mockClient.del).not.toHaveBeenCalled();
   });
