@@ -31,3 +31,7 @@ jobs:
       GCP_SA_KEY: ${{ secrets.INT_GCP_SA_KEY }}
       GCP_PROJECT_ID: ${{ secrets.INT_GCP_PROJECT_ID }}
       TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+      ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS_INT }}
+      DB_GATEWAY_BASE_URL: ${{ secrets.DB_GATEWAY_BASE_URL_INT }}
+      REDIS_URL: ${{ secrets.REDIS_URL_INT }}
+      CACHE_TTL: ${{ secrets.CACHE_TTL }}
