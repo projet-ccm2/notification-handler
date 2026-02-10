@@ -13,6 +13,17 @@ jest.mock("../../config/environment", () => ({
   config: {
     nodeEnv: "production",
     port: 3000,
+    cors: { allowedOrigins: [] },
+    dbGateway: { baseUrl: "http://localhost:8080" },
+    redis: { url: "redis://localhost:6379" },
+    cache: { ttl: 3600 },
+  },
+}));
+
+jest.mock("../../services/redis-service", () => ({
+  RedisService: {
+    connect: jest.fn().mockResolvedValue(undefined),
+    disconnect: jest.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -45,9 +56,22 @@ describe("Production Server", () => {
       }),
       get: jest.fn(),
       disable: jest.fn(),
+      use: jest.fn().mockReturnThis(),
     };
 
-    jest.doMock("express", () => jest.fn(() => mockApp));
+    const mockRouter = {
+      post: jest.fn().mockReturnThis(),
+      get: jest.fn().mockReturnThis(),
+      delete: jest.fn().mockReturnThis(),
+      use: jest.fn().mockReturnThis(),
+    };
+    const expressFn = jest.fn(() => mockApp);
+    (expressFn as any).json = jest.fn();
+    jest.doMock("express", () => ({
+      __esModule: true,
+      default: expressFn,
+      Router: jest.fn(() => mockRouter),
+    }));
 
     jest.clearAllMocks();
   });
@@ -67,7 +91,7 @@ describe("Production Server", () => {
     expect(process.on).toHaveBeenCalledWith("SIGINT", expect.any(Function));
   });
 
-  it("should handle SIGTERM in production", () => {
+  it("should handle SIGTERM in production", async () => {
     require("../../index");
 
     const sigtermHandler = (process.on as jest.Mock).mock.calls.find(
@@ -77,12 +101,12 @@ describe("Production Server", () => {
     expect(sigtermHandler).toBeDefined();
 
     if (sigtermHandler) {
-      sigtermHandler();
+      await sigtermHandler();
       expect(mockServer.close).toHaveBeenCalled();
     }
   });
 
-  it("should handle SIGINT in production", () => {
+  it("should handle SIGINT in production", async () => {
     require("../../index");
 
     const sigintHandler = (process.on as jest.Mock).mock.calls.find(
@@ -92,7 +116,7 @@ describe("Production Server", () => {
     expect(sigintHandler).toBeDefined();
 
     if (sigintHandler) {
-      sigintHandler();
+      await sigintHandler();
       expect(mockServer.close).toHaveBeenCalled();
     }
   });
