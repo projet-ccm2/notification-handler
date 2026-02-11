@@ -110,7 +110,7 @@ describe("ChannelPointRewardHandler", () => {
       userLogin: "user",
       channelId: "ch1",
       payload: {
-        reward: { type: "auto", cost: 300, unlocked_emote: null },
+        reward: { type: "auto", cost: 300, unlockedEmote: null },
         message: { text: "", emotes: [] },
       },
     };
