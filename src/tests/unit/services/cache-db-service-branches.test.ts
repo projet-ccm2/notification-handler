@@ -204,7 +204,7 @@ describe("CacheDbService branches", () => {
       expect(DbService.getAchievements).toHaveBeenCalledWith("ch1");
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("a1");
-      expect(result[0].achieved).toBeNull();
+      expect(result[0].achieved.count).toBe(0);
     });
   });
 
@@ -328,7 +328,7 @@ describe("CacheDbService branches", () => {
         1,
         1,
         "L",
-        null,
+        { id: "t1", label: "points", data: "{}" },
         {
           achievementId: "a1",
           userId: "u1",
