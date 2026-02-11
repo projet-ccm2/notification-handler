@@ -22,10 +22,7 @@ export class UserAchievement {
     public readonly channelId: string,
   ) {}
 
-  static defaultAchieved(
-    achievementId: string,
-    userId: string,
-  ): Achieved {
+  static defaultAchieved(achievementId: string, userId: string): Achieved {
     return {
       achievementId,
       userId,

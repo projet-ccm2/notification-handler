@@ -9,19 +9,19 @@ import {
   UserAchievement,
 } from "../types";
 
-type DefinitionWithType = AchievementWithType & { typeAchievement: TypeAchievement };
+type DefinitionWithType = AchievementWithType & {
+  typeAchievement: TypeAchievement;
+};
 
 export class CacheDbService {
   private static readonly CACHE_PREFIX_ACHIEVEMENTS = "achievements:";
   private static readonly CACHE_PREFIX_USER_ACHIEVED = "user_achieved:";
   private static readonly CACHE_TTL = config.cache.ttl;
 
-  /** Cache key for channel achievement definitions (shared). */
   private static buildAchievementsCacheKey(channelId: string): string {
     return `${this.CACHE_PREFIX_ACHIEVEMENTS}${channelId}`;
   }
 
-  /** Cache key for user achieved list on a channel. */
   private static buildUserAchievedCacheKey(
     userId: string,
     channelId: string,
@@ -29,7 +29,6 @@ export class CacheDbService {
     return `${this.CACHE_PREFIX_USER_ACHIEVED}${userId}:${channelId}`;
   }
 
-  /** Merges definitions + achieved list and filters by type label; returns [] if none match. */
   private static mergeAndFilter(
     definitions: AchievementWithType[],
     achievedList: Achieved[],
@@ -158,9 +157,10 @@ export class CacheDbService {
       const achievedList =
         itemsWithType.length === 0
           ? []
-          : itemsWithType.map((item) =>
-              item.achieved ??
-              UserAchievement.defaultAchieved(item.id, userId),
+          : itemsWithType.map(
+              (item) =>
+                item.achieved ??
+                UserAchievement.defaultAchieved(item.id, userId),
             );
 
       await RedisService.set(cacheKeyAchievements, definitions, this.CACHE_TTL);
@@ -178,8 +178,9 @@ export class CacheDbService {
     }
   }
 
-  /** Updates only the achieved part in cache; marks for sync to DB on expiry. */
   static async update(userAchievement: UserAchievement): Promise<void> {
+    if (!userAchievement.achieved)
+      throw new Error("UserAchievement.achieved is required for update");
     const userId = userAchievement.achieved.userId;
     if (!userId)
       throw new Error("UserAchievement.achieved is required for update");

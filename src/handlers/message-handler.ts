@@ -47,14 +47,18 @@ export class MessageHandler {
     }
   }
 
-  static async handleMessageContent(userId: string, channelId: string, message: string): Promise<void> {
+  static async handleMessageContent(
+    userId: string,
+    channelId: string,
+    message: string,
+  ): Promise<void> {
     const achievements = await CacheDbService.getAchievements(
       channelId,
       userId,
       CONTENT_MESSAGE_TYPE,
     );
     const lowercaseMessage = message.toLowerCase();
-    let achievementLabelLowercase : string
+    let achievementLabelLowercase: string;
     for (const ua of achievements) {
       achievementLabelLowercase = ua.label.toLowerCase();
       if (lowercaseMessage.includes(achievementLabelLowercase)) {
