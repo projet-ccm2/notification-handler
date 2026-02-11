@@ -3,6 +3,7 @@ import { CacheDbService } from "../services/cache-db-service";
 import { logger } from "../utils/logger";
 
 const COUNT_MESSAGE_TYPE = "countMessage";
+const CONTENT_MESSAGE_TYPE = "contentMessage";
 
 export class MessageHandler {
   static async handle(event: TwitchEvent): Promise<void> {
@@ -16,15 +17,18 @@ export class MessageHandler {
 
     const userId = event.userId;
     const channelId = event.channelId;
-    if (!userId || !channelId) {
-      logger.error("Missing userId or channelId", {
+    const messageContent = payload.message;
+    if (!userId || !channelId || !messageContent) {
+      logger.error("Missing userId or channelId or messageContent", {
         eventId: event.id,
         channel: event.channelLogin,
         user: event.userLogin,
+        message: messageContent,
       });
       return;
     }
     await this.handleCountMessages(userId, channelId);
+    await this.handleMessageContent(userId, channelId, payload.message);
   }
 
   static async handleCountMessages(
@@ -40,6 +44,24 @@ export class MessageHandler {
       ua.achieved.count += 1;
       ua.achieved.finished = ua.achieved.count >= ua.goal;
       await CacheDbService.update(ua);
+    }
+  }
+
+  static async handleMessageContent(userId: string, channelId: string, message: string): Promise<void> {
+    const achievements = await CacheDbService.getAchievements(
+      channelId,
+      userId,
+      CONTENT_MESSAGE_TYPE,
+    );
+    const lowercaseMessage = message.toLowerCase();
+    let achievementLabelLowercase : string
+    for (const ua of achievements) {
+      achievementLabelLowercase = ua.label.toLowerCase();
+      if (lowercaseMessage.includes(achievementLabelLowercase)) {
+        ua.achieved.count += 1;
+        ua.achieved.finished = ua.achieved.count >= ua.goal;
+        await CacheDbService.update(ua);
+      }
     }
   }
 }
