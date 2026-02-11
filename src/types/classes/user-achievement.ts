@@ -45,13 +45,13 @@ export class UserAchievement {
     }
     const achieved =
       item.achieved ??
-      (userId != null
-        ? UserAchievement.defaultAchieved(item.id, userId)
-        : (() => {
+      (userId == null
+        ? (() => {
             throw new Error(
               "UserAchievement.fromApi requires item.achieved or userId when achieved is null",
             );
-          })());
+          })()
+        : UserAchievement.defaultAchieved(item.id, userId));
     return new UserAchievement(
       item.id,
       item.title,
