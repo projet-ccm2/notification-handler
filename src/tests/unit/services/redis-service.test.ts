@@ -78,7 +78,11 @@ describe("RedisService", () => {
   it("set uses setEx when ttl provided", async () => {
     mockClient.setEx.mockResolvedValue("OK");
     await RedisService.set("k", { x: 1 }, 60);
-    expect(mockClient.setEx).toHaveBeenCalledWith("test:k", 60, expect.any(String));
+    expect(mockClient.setEx).toHaveBeenCalledWith(
+      "test:k",
+      60,
+      expect.any(String),
+    );
     expect(mockClient.set).not.toHaveBeenCalled();
   });
 

@@ -25,14 +25,14 @@ cp .env.example .env
 
 ## Environment variables
 
-| Variable              | Description                           | Default                                       |
-| --------------------- | ------------------------------------- | --------------------------------------------- |
-| `PORT`                | Server port                           | `3000`                                        |
-| `NODE_ENV`            | `development` / `integration` / `production` / `test`. Used as Redis key prefix for multi-env isolation when sharing a single Redis instance. | `development`                                 |
-| `ALLOWED_ORIGINS`     | CORS origins (comma-separated)        | `http://localhost:3000,http://localhost:8080` |
-| `DB_SERVICE_URL`      | DB service base URL (achievements)     | `http://localhost:8080`                       |
-| `REDIS_URL`           | Redis URL                             | `redis://localhost:6379`                      |
-| `CACHE_TTL`           | Cache TTL in seconds                  | `3600`                                        |
+| Variable          | Description                                                                                                                                   | Default                                       |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `PORT`            | Server port                                                                                                                                   | `3000`                                        |
+| `NODE_ENV`        | `development` / `integration` / `production` / `test`. Used as Redis key prefix for multi-env isolation when sharing a single Redis instance. | `development`                                 |
+| `ALLOWED_ORIGINS` | CORS origins (comma-separated)                                                                                                                | `http://localhost:3000,http://localhost:8080` |
+| `DB_SERVICE_URL`  | DB service base URL (achievements)                                                                                                            | `http://localhost:8080`                       |
+| `REDIS_URL`       | Redis URL                                                                                                                                     | `redis://localhost:6379`                      |
+| `CACHE_TTL`       | Cache TTL in seconds                                                                                                                          | `3600`                                        |
 
 When sharing a single Redis instance across environments (dev, int, prod), keys are prefixed by `NODE_ENV` (e.g. `development:achievements:ch1`) to avoid collisions.
 
