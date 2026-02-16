@@ -25,7 +25,7 @@ function validateConfig(): Config {
         : ["http://localhost:3000", "http://localhost:8080", "null"],
     },
     dbGateway: {
-      baseUrl: process.env.DB_GATEWAY_BASE_URL || "http://localhost:8080",
+      baseUrl: process.env.DB_SERVICE_URL || "http://localhost:8080",
     },
     redis: {
       url: process.env.REDIS_URL || "redis://localhost:6379",

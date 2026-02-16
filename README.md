@@ -30,7 +30,7 @@ cp .env.example .env
 | `PORT`                | Server port                           | `3000`                                        |
 | `NODE_ENV`            | `development` / `production` / `test` | `development`                                 |
 | `ALLOWED_ORIGINS`     | CORS origins (comma-separated)        | `http://localhost:3000,http://localhost:8080` |
-| `DB_GATEWAY_BASE_URL` | DB gateway base URL (achievements)    | `http://localhost:8080`                       |
+| `DB_SERVICE_URL`      | DB service base URL (achievements)     | `http://localhost:8080`                       |
 | `REDIS_URL`           | Redis URL                             | `redis://localhost:6379`                      |
 | `CACHE_TTL`           | Cache TTL in seconds                  | `3600`                                        |
 
