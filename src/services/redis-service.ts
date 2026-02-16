@@ -10,6 +10,15 @@ export class RedisService {
   private static client: RedisClientType | null = null;
   private static isConnected = false;
 
+  private static prefixKey(key: string): string {
+    return `${config.nodeEnv}:${key}`;
+  }
+
+  private static stripPrefix(key: string): string {
+    const prefix = `${config.nodeEnv}:`;
+    return key.startsWith(prefix) ? key.slice(prefix.length) : key;
+  }
+
   static async connect(): Promise<void> {
     if (this.client && this.isConnected) return;
 
@@ -47,7 +56,7 @@ export class RedisService {
   }
 
   static async get<T>(key: string): Promise<T | null> {
-    const value = await this.execute((c) => c.get(key));
+    const value = await this.execute((c) => c.get(this.prefixKey(key)));
     return value ? (JSON.parse(value) as T) : null;
   }
 
@@ -57,25 +66,27 @@ export class RedisService {
     ttlSeconds?: number,
   ): Promise<void> {
     const serialized = JSON.stringify(value);
+    const prefixedKey = this.prefixKey(key);
     await this.execute((c) =>
       ttlSeconds
-        ? c.setEx(key, ttlSeconds, serialized)
-        : c.set(key, serialized),
+        ? c.setEx(prefixedKey, ttlSeconds, serialized)
+        : c.set(prefixedKey, serialized),
     );
   }
 
   static async delete(key: string): Promise<void> {
-    await this.execute((c) => c.del(key));
+    await this.execute((c) => c.del(this.prefixKey(key)));
   }
 
   private static async scanKeys(pattern: string): Promise<string[]> {
+    const prefixedPattern = this.prefixKey(pattern);
     return this.execute(async (client) => {
       const keys: string[] = [];
       for await (const key of client.scanIterator({
-        MATCH: pattern,
+        MATCH: prefixedPattern,
         COUNT: 100,
       })) {
-        keys.push(key);
+        keys.push(this.stripPrefix(key));
       }
       return keys;
     });
@@ -86,23 +97,30 @@ export class RedisService {
   }
 
   static async exists(key: string): Promise<boolean> {
-    return (await this.execute((c) => c.exists(key))) === 1;
+    return (await this.execute((c) => c.exists(this.prefixKey(key)))) === 1;
   }
 
   static async getTtl(key: string): Promise<number> {
-    return this.execute((c) => c.ttl(key));
+    return this.execute((c) => c.ttl(this.prefixKey(key)));
   }
 
   static async addToSyncSet(key: string): Promise<void> {
-    await this.execute((c) => c.sAdd("sync:pending", key));
+    await this.execute((c) =>
+      c.sAdd(this.prefixKey("sync:pending"), this.prefixKey(key)),
+    );
   }
 
   static async removeFromSyncSet(key: string): Promise<void> {
-    await this.execute((c) => c.sRem("sync:pending", key));
+    await this.execute((c) =>
+      c.sRem(this.prefixKey("sync:pending"), this.prefixKey(key)),
+    );
   }
 
   static async getPendingSyncKeys(): Promise<string[]> {
-    return this.execute((c) => c.sMembers("sync:pending"));
+    const members = await this.execute((c) =>
+      c.sMembers(this.prefixKey("sync:pending")),
+    );
+    return members.map((k) => this.stripPrefix(k));
   }
 
   static async storeSyncData(
@@ -111,7 +129,11 @@ export class RedisService {
   ): Promise<void> {
     const syncKey = `sync:data:${cacheKey}:${syncData.achievementId}`;
     await this.execute((c) =>
-      c.setEx(syncKey, config.cache.ttl + 60, JSON.stringify(syncData)),
+      c.setEx(
+        this.prefixKey(syncKey),
+        config.cache.ttl + 60,
+        JSON.stringify(syncData),
+      ),
     );
   }
 
@@ -120,7 +142,7 @@ export class RedisService {
     achievementId: string,
   ): Promise<{ userId: string; achievementId: string; data: unknown } | null> {
     const syncKey = `sync:data:${cacheKey}:${achievementId}`;
-    const value = await this.execute((c) => c.get(syncKey));
+    const value = await this.execute((c) => c.get(this.prefixKey(syncKey)));
     return value
       ? (JSON.parse(value) as {
           userId: string;
@@ -134,7 +156,9 @@ export class RedisService {
     cacheKey: string,
     achievementId: string,
   ): Promise<void> {
-    await this.execute((c) => c.del(`sync:data:${cacheKey}:${achievementId}`));
+    await this.execute((c) =>
+      c.del(this.prefixKey(`sync:data:${cacheKey}:${achievementId}`)),
+    );
   }
 
   static async getAllSyncDataForCacheKey(
@@ -145,7 +169,7 @@ export class RedisService {
     const syncDataArray = [];
 
     for (const key of keys) {
-      const value = await this.execute((c) => c.get(key));
+      const value = await this.execute((c) => c.get(this.prefixKey(key)));
       if (value) syncDataArray.push(JSON.parse(value));
     }
 
@@ -155,7 +179,9 @@ export class RedisService {
   static async deleteAllSyncDataForCacheKey(cacheKey: string): Promise<void> {
     const pattern = `sync:data:${cacheKey}:*`;
     const keys = await this.scanKeys(pattern);
-    if (keys.length > 0) await this.execute((c) => c.del(keys));
+    if (keys.length > 0) {
+      await this.execute((c) => c.del(keys.map((k) => this.prefixKey(k))));
+    }
   }
 
   static async acquireLock(
@@ -164,14 +190,17 @@ export class RedisService {
   ): Promise<string | false> {
     const token = randomUUID();
     const result = await this.execute((c) =>
-      c.set(lockKey, token, { NX: true, EX: ttlSeconds }),
+      c.set(this.prefixKey(lockKey), token, { NX: true, EX: ttlSeconds }),
     );
     return result === "OK" ? token : false;
   }
 
   static async releaseLock(lockKey: string, token: string): Promise<void> {
     await this.execute((c) =>
-      c.eval(RELEASE_LOCK_SCRIPT, { keys: [lockKey], arguments: [token] }),
+      c.eval(RELEASE_LOCK_SCRIPT, {
+        keys: [this.prefixKey(lockKey)],
+        arguments: [token],
+      }),
     );
   }
 }

@@ -78,14 +78,18 @@ describe("RedisService", () => {
   it("set uses setEx when ttl provided", async () => {
     mockClient.setEx.mockResolvedValue("OK");
     await RedisService.set("k", { x: 1 }, 60);
-    expect(mockClient.setEx).toHaveBeenCalledWith("k", 60, expect.any(String));
+    expect(mockClient.setEx).toHaveBeenCalledWith(
+      "test:k",
+      60,
+      expect.any(String),
+    );
     expect(mockClient.set).not.toHaveBeenCalled();
   });
 
   it("set uses set when ttl not provided", async () => {
     mockClient.set.mockResolvedValue("OK");
     await RedisService.set("k", "v");
-    expect(mockClient.set).toHaveBeenCalledWith("k", expect.any(String));
+    expect(mockClient.set).toHaveBeenCalledWith("test:k", expect.any(String));
     expect(mockClient.setEx).not.toHaveBeenCalled();
   });
 
@@ -94,7 +98,7 @@ describe("RedisService", () => {
     const result = await RedisService.acquireLock("lock:1", 15);
     expect(typeof result).toBe("string");
     expect(result).not.toBe(false);
-    expect(mockClient.set).toHaveBeenCalledWith("lock:1", result, {
+    expect(mockClient.set).toHaveBeenCalledWith("test:lock:1", result, {
       NX: true,
       EX: 15,
     });
@@ -111,7 +115,7 @@ describe("RedisService", () => {
     await RedisService.releaseLock("lock:3", "my-token");
     expect(mockClient.eval).toHaveBeenCalledWith(
       expect.stringContaining("redis.call('get'"),
-      { keys: ["lock:3"], arguments: ["my-token"] },
+      { keys: ["test:lock:3"], arguments: ["my-token"] },
     );
   });
 
@@ -119,17 +123,17 @@ describe("RedisService", () => {
     mockClient.ttl.mockResolvedValue(42);
     const result = await RedisService.getTtl("key");
     expect(result).toBe(42);
-    expect(mockClient.ttl).toHaveBeenCalledWith("key");
+    expect(mockClient.ttl).toHaveBeenCalledWith("test:key");
   });
 
   it("deleteAllSyncDataForCacheKey calls del when keys found", async () => {
     async function* keyGen() {
-      yield "sync:data:ck:a1";
+      yield "test:sync:data:ck:a1";
     }
     mockClient.scanIterator.mockReturnValue(keyGen());
     mockClient.del.mockResolvedValue(1);
     await RedisService.deleteAllSyncDataForCacheKey("ck");
-    expect(mockClient.del).toHaveBeenCalledWith(["sync:data:ck:a1"]);
+    expect(mockClient.del).toHaveBeenCalledWith(["test:sync:data:ck:a1"]);
   });
 
   it("deleteAllSyncDataForCacheKey does not call del when no keys", async () => {
