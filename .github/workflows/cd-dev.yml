@@ -22,6 +22,7 @@ jobs:
     uses: projet-ccm2/shared-workflows/.github/workflows/nodejs-cd.yml@main
     if: github.event_name != 'pull_request'
     with:
+      required_env_vars: GCP_SA_KEY,GCP_PROJECT_ID,TWITCH_CLIENT_ID,ALLOWED_ORIGINS,DB_GATEWAY_BASE_URL,REDIS_URL,CACHE_TTL
       docker-image-name: notification-handler-api-dev
       docker-tag: ${{ github.event.inputs.image-tag || format('dev-{0}', github.sha) }}
       artifact-registry-repository: "notification-handler-docker-dev"
