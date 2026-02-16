@@ -29,9 +29,10 @@ export class DbService {
   static async getAchievements(
     channelId: string,
   ): Promise<AchievementWithType[]> {
-    return fetchJson<AchievementWithType[]>(
+    const raw = await fetchJson<AchievementWithType[]>(
       `${config.dbGateway.baseUrl}/achievements/channel/${channelId}`,
     );
+    return raw.filter((a) => a.typeAchievement != null);
   }
 
   static async getUserAchievements(

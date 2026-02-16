@@ -4,21 +4,24 @@ import { DbService } from "./db-service";
 import {
   AchievementWithType,
   Achieved,
+  TypeAchievement,
   UpdateUserAchievementRequest,
   UserAchievement,
 } from "../types";
+
+type DefinitionWithType = AchievementWithType & {
+  typeAchievement: TypeAchievement;
+};
 
 export class CacheDbService {
   private static readonly CACHE_PREFIX_ACHIEVEMENTS = "achievements:";
   private static readonly CACHE_PREFIX_USER_ACHIEVED = "user_achieved:";
   private static readonly CACHE_TTL = config.cache.ttl;
 
-  /** Cache key for channel achievement definitions (shared). */
   private static buildAchievementsCacheKey(channelId: string): string {
     return `${this.CACHE_PREFIX_ACHIEVEMENTS}${channelId}`;
   }
 
-  /** Cache key for user achieved list on a channel. */
   private static buildUserAchievedCacheKey(
     userId: string,
     channelId: string,
@@ -26,25 +29,29 @@ export class CacheDbService {
     return `${this.CACHE_PREFIX_USER_ACHIEVED}${userId}:${channelId}`;
   }
 
-  /** Merges definitions + achieved list and filters by type label; returns [] if none match. */
   private static mergeAndFilter(
     definitions: AchievementWithType[],
     achievedList: Achieved[],
     channelId: string,
     typeAchievementLabel: string,
+    userId: string,
   ): UserAchievement[] {
+    const defsWithType = definitions.filter(
+      (d): d is DefinitionWithType => d.typeAchievement != null,
+    );
     const achievedByAchievementId = new Map<string, Achieved>(
       achievedList.map((a) => [a.achievementId, a]),
     );
-    const merged = definitions.map((def) =>
+    const merged = defsWithType.map((def) =>
       UserAchievement.fromMerged(
         def,
-        achievedByAchievementId.get(def.id) ?? null,
+        achievedByAchievementId.get(def.id) ??
+          UserAchievement.defaultAchieved(def.id, userId),
         channelId,
       ),
     );
     return merged.filter(
-      (u) => u.typeAchievement?.label === typeAchievementLabel,
+      (u) => u.typeAchievement.label === typeAchievementLabel,
     );
   }
 
@@ -53,12 +60,19 @@ export class CacheDbService {
     cacheKeyUser: string,
     channelId: string,
     typeAchievement: string,
+    userId: string,
   ): Promise<UserAchievement[] | null> {
     const defs =
       await RedisService.get<AchievementWithType[]>(cacheKeyAchievements);
     const achieved = await RedisService.get<Achieved[]>(cacheKeyUser);
     if (!defs || achieved === null) return null;
-    return this.mergeAndFilter(defs, achieved, channelId, typeAchievement);
+    return this.mergeAndFilter(
+      defs,
+      achieved,
+      channelId,
+      typeAchievement,
+      userId,
+    );
   }
 
   static async getAchievements(
@@ -74,6 +88,7 @@ export class CacheDbService {
       cacheKeyUser,
       channelId,
       typeAchievement,
+      userId,
     );
     if (cached) return cached;
 
@@ -93,6 +108,7 @@ export class CacheDbService {
         cacheKeyUser,
         channelId,
         typeAchievement,
+        userId,
       );
       if (retry) return retry;
     }
@@ -103,6 +119,7 @@ export class CacheDbService {
         cacheKeyUser,
         channelId,
         typeAchievement,
+        userId,
       );
       return final ?? [];
     }
@@ -113,6 +130,7 @@ export class CacheDbService {
         cacheKeyUser,
         channelId,
         typeAchievement,
+        userId,
       );
       if (again) return again;
 
@@ -120,10 +138,14 @@ export class CacheDbService {
         userId,
         channelId,
       );
-      const definitions =
+      const itemsWithType =
         apiResponse.length === 0
+          ? []
+          : apiResponse.filter((item) => item.typeAchievement != null);
+      const definitions =
+        itemsWithType.length === 0
           ? await DbService.getAchievements(channelId)
-          : apiResponse.map((item) => ({
+          : itemsWithType.map((item) => ({
               id: item.id,
               title: item.title,
               description: item.description,
@@ -133,11 +155,13 @@ export class CacheDbService {
               typeAchievement: item.typeAchievement,
             }));
       const achievedList =
-        apiResponse.length === 0
+        itemsWithType.length === 0
           ? []
-          : apiResponse
-              .map((item) => item.achieved)
-              .filter((a): a is Achieved => a !== null);
+          : itemsWithType.map(
+              (item) =>
+                item.achieved ??
+                UserAchievement.defaultAchieved(item.id, userId),
+            );
 
       await RedisService.set(cacheKeyAchievements, definitions, this.CACHE_TTL);
       await RedisService.set(cacheKeyUser, achievedList, this.CACHE_TTL);
@@ -147,15 +171,17 @@ export class CacheDbService {
         achievedList,
         channelId,
         typeAchievement,
+        userId,
       );
     } finally {
       if (lockToken) await RedisService.releaseLock(lockKey, lockToken);
     }
   }
 
-  /** Updates only the achieved part in cache; marks for sync to DB on expiry. */
   static async update(userAchievement: UserAchievement): Promise<void> {
-    const userId = userAchievement.achieved?.userId;
+    if (!userAchievement.achieved)
+      throw new Error("UserAchievement.achieved is required for update");
+    const userId = userAchievement.achieved.userId;
     if (!userId)
       throw new Error("UserAchievement.achieved is required for update");
     const channelId = userAchievement.channelId;
@@ -173,7 +199,7 @@ export class CacheDbService {
         let achievedList = await RedisService.get<Achieved[]>(cacheKey);
 
         if (achievedList === null) {
-          const typeLabel = userAchievement.typeAchievement?.label ?? "";
+          const typeLabel = userAchievement.typeAchievement.label;
           await this.getAchievements(channelId, userId, typeLabel);
           achievedList = (await RedisService.get<Achieved[]>(cacheKey)) ?? [];
         }

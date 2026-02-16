@@ -126,7 +126,7 @@ describe("CacheDbService (Testcontainers Redis)", () => {
         toUpdate.label,
         toUpdate.typeAchievement,
         {
-          ...toUpdate.achieved!,
+          ...toUpdate.achieved,
           count: 10,
           finished: true,
         },
@@ -142,22 +142,22 @@ describe("CacheDbService (Testcontainers Redis)", () => {
         "user1",
         "points",
       );
-      expect(afterUpdate[0].achieved?.count).toBe(10);
-      expect(afterUpdate[0].achieved?.finished).toBe(true);
+      expect(afterUpdate[0].achieved.count).toBe(10);
+      expect(afterUpdate[0].achieved.finished).toBe(true);
     });
 
     it("throws when achieved is missing", async () => {
-      const invalid = new UserAchievement(
-        "id",
-        "t",
-        "d",
-        1,
-        1,
-        "l",
-        null,
-        null,
-        "ch",
-      );
+      const invalid = {
+        id: "id",
+        title: "t",
+        description: "d",
+        goal: 1,
+        reward: 1,
+        label: "l",
+        typeAchievement: { id: "t", label: "l", data: "{}" },
+        achieved: null,
+        channelId: "ch",
+      } as unknown as UserAchievement;
       await expect(CacheDbService.update(invalid)).rejects.toThrow(
         "UserAchievement.achieved is required for update",
       );
@@ -184,7 +184,7 @@ describe("CacheDbService (Testcontainers Redis)", () => {
         toUpdate.reward,
         toUpdate.label,
         toUpdate.typeAchievement,
-        { ...toUpdate.achieved!, count: 1 },
+        { ...toUpdate.achieved, count: 1 },
         "ch4",
       );
       await CacheDbService.update(updated);
