@@ -34,5 +34,5 @@ jobs:
       TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
       ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS_DEV }}
       DB_SERVICE_URL: ${{ secrets.DEV_DB_SERVICE_URL }}
-      REDIS_URL: ${{ secrets.REDIS_URL_DEV }}
+      REDIS_URL: ${{ secrets.REDIS_URL }}
       CACHE_TTL: ${{ secrets.CACHE_TTL }}
