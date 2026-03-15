@@ -184,10 +184,9 @@ export class CacheDbService {
     channelId: string,
     newList: Achieved[],
   ): Promise<void> {
-    let definitions =
-      await RedisService.get<AchievementWithType[]>(
-        this.buildAchievementsCacheKey(channelId),
-      );
+    let definitions = await RedisService.get<AchievementWithType[]>(
+      this.buildAchievementsCacheKey(channelId),
+    );
     definitions ??= await DbService.getAchievements(channelId);
     const allFinished = definitions.every(
       (def) =>
@@ -223,8 +222,7 @@ export class CacheDbService {
             userId,
             userAchievement.typeAchievement.label,
           );
-          achievedList =
-            (await RedisService.get<Achieved[]>(cacheKey)) ?? [];
+          achievedList = (await RedisService.get<Achieved[]>(cacheKey)) ?? [];
         }
 
         const updated = userAchievement.toCacheAchieved();
