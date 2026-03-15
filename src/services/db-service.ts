@@ -58,9 +58,7 @@ export class DbService {
   }
 
   static async getUser(userId: string): Promise<User> {
-    return fetchJson<User>(
-      `${config.dbGateway.baseUrl}/users/${userId}`,
-    );
+    return fetchJson<User>(`${config.dbGateway.baseUrl}/users/${userId}`);
   }
 
   static async addExpToUser(userId: string, amount: number): Promise<void> {
