@@ -369,6 +369,32 @@ describe("CacheDbService branches", () => {
   });
 
   describe("update", () => {
+    it("throws when achieved has no userId", async () => {
+      const u = new UserAchievement(
+        "a1",
+        "T",
+        "D",
+        1,
+        1,
+        "L",
+        { id: "t1", label: "points", data: "{}" },
+        {
+          achievementId: "a1",
+          userId: "",
+          count: 0,
+          finished: false,
+          labelActive: false,
+          acquiredDate: "",
+        },
+        "ch1",
+      );
+
+      await expect(CacheDbService.update(u)).rejects.toThrow(
+        "UserAchievement.achieved is required for update",
+      );
+      expect(Redis.acquireLock).not.toHaveBeenCalled();
+    });
+
     it("throws when lock not acquired after 10 attempts", async () => {
       Redis.acquireLock.mockResolvedValue(false);
 
@@ -539,6 +565,121 @@ describe("CacheDbService branches", () => {
       await CacheDbService.update(u);
 
       expect(BadgeService.tryGrantBadge).toHaveBeenCalledWith("u1", "ch1");
+    });
+
+    it("calls DbService.getAchievements when definitions cache is null and isNewCompletion", async () => {
+      const achievedItem = {
+        achievementId: "a1",
+        userId: "u1",
+        count: 4,
+        finished: false,
+        labelActive: false,
+        acquiredDate: "2025-01-01",
+      };
+      const definitions = [
+        {
+          id: "a1",
+          title: "T",
+          description: "D",
+          goal: 5,
+          reward: 50,
+          label: "L",
+          typeAchievement: { id: "t1", label: "points", data: "{}" },
+        },
+      ];
+      Redis.get
+        .mockResolvedValueOnce([achievedItem])
+        .mockResolvedValueOnce(null);
+      Redis.acquireLock.mockResolvedValue("token");
+      Redis.set.mockResolvedValue(undefined);
+      Redis.addToSyncSet.mockResolvedValue(undefined);
+      Redis.storeSyncData.mockResolvedValue(undefined);
+      Redis.releaseLock.mockResolvedValue(undefined);
+      (DbService.getAchievements as jest.Mock).mockResolvedValue(definitions);
+      BadgeService.tryGrantBadge.mockResolvedValue(undefined);
+
+      const u = new UserAchievement(
+        "a1",
+        "T",
+        "D",
+        5,
+        50,
+        "L",
+        { id: "t1", label: "points", data: "{}" },
+        { ...achievedItem, count: 5, finished: true },
+        "ch1",
+      );
+
+      await CacheDbService.update(u);
+
+      expect(DbService.getAchievements).toHaveBeenCalledWith("ch1");
+      expect(BadgeService.tryGrantBadge).toHaveBeenCalledWith("u1", "ch1");
+    });
+
+    it("does not call tryGrantBadge when isNewCompletion but not all achievements finished", async () => {
+      const achievedItem = {
+        achievementId: "a1",
+        userId: "u1",
+        count: 4,
+        finished: false,
+        labelActive: false,
+        acquiredDate: "2025-01-01",
+      };
+      const definitions = [
+        {
+          id: "a1",
+          title: "T",
+          description: "D",
+          goal: 5,
+          reward: 50,
+          label: "L",
+          typeAchievement: { id: "t1", label: "points", data: "{}" },
+        },
+        {
+          id: "a2",
+          title: "T2",
+          description: "D2",
+          goal: 10,
+          reward: 100,
+          label: "L2",
+          typeAchievement: { id: "t2", label: "points", data: "{}" },
+        },
+      ];
+      const achievedList = [
+        achievedItem,
+        {
+          achievementId: "a2",
+          userId: "u1",
+          count: 2,
+          finished: false,
+          labelActive: false,
+          acquiredDate: "2025-01-01",
+        },
+      ];
+      Redis.get
+        .mockResolvedValueOnce(achievedList)
+        .mockResolvedValueOnce(definitions);
+      Redis.acquireLock.mockResolvedValue("token");
+      Redis.set.mockResolvedValue(undefined);
+      Redis.addToSyncSet.mockResolvedValue(undefined);
+      Redis.storeSyncData.mockResolvedValue(undefined);
+      Redis.releaseLock.mockResolvedValue(undefined);
+
+      const u = new UserAchievement(
+        "a1",
+        "T",
+        "D",
+        5,
+        50,
+        "L",
+        { id: "t1", label: "points", data: "{}" },
+        { ...achievedItem, count: 5, finished: true },
+        "ch1",
+      );
+
+      await CacheDbService.update(u);
+
+      expect(BadgeService.tryGrantBadge).not.toHaveBeenCalled();
     });
 
     it("does not store rewardToAdd when finished was already true", async () => {

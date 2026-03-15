@@ -18,6 +18,7 @@ jest.mock("../../../utils/logger", () => ({
 }));
 
 const { DbService } = require("../../../services/db-service");
+const { logger } = require("../../../utils/logger");
 
 describe("BadgeService", () => {
   beforeEach(() => {
@@ -71,5 +72,58 @@ describe("BadgeService", () => {
       "b1",
       expect.any(String),
     );
+    expect(logger.info).toHaveBeenCalledWith("Badge granted", {
+      userId: "u1",
+      channelId: "ch1",
+      badgeId: "b1",
+    });
+  });
+
+  it("ignores 409 conflict from postPossesses", async () => {
+    (DbService.getChannelBadge as jest.Mock).mockResolvedValue({
+      id: "b1",
+      title: "Badge",
+      img: "badge.png",
+    });
+    (DbService.getPossesses as jest.Mock).mockResolvedValue(null);
+    (DbService.postPossesses as jest.Mock).mockRejectedValue(
+      new Error("HTTP 409: Conflict"),
+    );
+
+    await BadgeService.tryGrantBadge("u1", "ch1");
+
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it("logs error when postPossesses fails with non-409", async () => {
+    (DbService.getChannelBadge as jest.Mock).mockResolvedValue({
+      id: "b1",
+      title: "Badge",
+      img: "badge.png",
+    });
+    (DbService.getPossesses as jest.Mock).mockResolvedValue(null);
+    (DbService.postPossesses as jest.Mock).mockRejectedValue(
+      new Error("HTTP 500: Server Error"),
+    );
+
+    await BadgeService.tryGrantBadge("u1", "ch1");
+
+    expect(logger.error).toHaveBeenCalledWith("Failed to grant badge", {
+      userId: "u1",
+      channelId: "ch1",
+      error: "HTTP 500: Server Error",
+    });
+  });
+
+  it("logs error when thrown value is not Error instance", async () => {
+    (DbService.getChannelBadge as jest.Mock).mockRejectedValue("string error");
+
+    await BadgeService.tryGrantBadge("u1", "ch1");
+
+    expect(logger.error).toHaveBeenCalledWith("Failed to grant badge", {
+      userId: "u1",
+      channelId: "ch1",
+      error: "string error",
+    });
   });
 });

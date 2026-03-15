@@ -245,4 +245,35 @@ describe("DbService", () => {
       }),
     );
   });
+
+  it("getChannelBadge throws on 500", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: "Server Error",
+    });
+    await expect(DbService.getChannelBadge("ch1")).rejects.toThrow("HTTP 500");
+  });
+
+  it("getPossesses throws on 500", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: "Server Error",
+    });
+    await expect(DbService.getPossesses("u1", "b1")).rejects.toThrow(
+      "HTTP 500",
+    );
+  });
+
+  it("postPossesses throws when response not ok", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      statusText: "Bad Request",
+    });
+    await expect(
+      DbService.postPossesses("u1", "b1", "2025-01-01"),
+    ).rejects.toThrow("HTTP 400");
+  });
 });
