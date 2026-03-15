@@ -1,6 +1,7 @@
 import { config } from "../config/environment";
 import { RedisService } from "./redis-service";
 import { DbService } from "./db-service";
+import { BadgeService } from "./badge-service";
 import {
   AchievementWithType,
   Achieved,
@@ -229,6 +230,24 @@ export class CacheDbService {
             ...(isNewCompletion && { rewardToAdd: userAchievement.reward }),
           },
         });
+
+        if (isNewCompletion) {
+          let definitions = await RedisService.get<AchievementWithType[]>(
+            this.buildAchievementsCacheKey(channelId),
+          );
+          if (!definitions) {
+            definitions = await DbService.getAchievements(channelId);
+          }
+          const allFinished =
+            definitions?.every(
+              (def) =>
+                newList.find((a) => a.achievementId === def.id)?.finished ===
+                true,
+            ) ?? false;
+          if (allFinished) {
+            await BadgeService.tryGrantBadge(userId, channelId);
+          }
+        }
         return;
       } finally {
         await RedisService.releaseLock(lockKey, lockToken);

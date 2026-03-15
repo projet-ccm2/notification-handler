@@ -19,11 +19,21 @@ jest.mock("../../../services/db-service", () => ({
     putAchieved: jest.fn(),
     getUser: jest.fn(),
     addExpToUser: jest.fn(),
+    getChannelBadge: jest.fn(),
+    getPossesses: jest.fn(),
+    postPossesses: jest.fn(),
+  },
+}));
+
+jest.mock("../../../services/badge-service", () => ({
+  BadgeService: {
+    tryGrantBadge: jest.fn(),
   },
 }));
 
 const Redis = RedisService as jest.Mocked<typeof RedisService>;
 const { DbService } = require("../../../services/db-service");
+const { BadgeService } = require("../../../services/badge-service");
 
 describe("CacheDbService branches", () => {
   beforeEach(() => {
@@ -482,6 +492,53 @@ describe("CacheDbService branches", () => {
           }),
         }),
       );
+    });
+
+    it("calls tryGrantBadge when isNewCompletion and all achievements finished", async () => {
+      const achievedItem = {
+        achievementId: "a1",
+        userId: "u1",
+        count: 4,
+        finished: false,
+        labelActive: false,
+        acquiredDate: "2025-01-01",
+      };
+      const definitions = [
+        {
+          id: "a1",
+          title: "T",
+          description: "D",
+          goal: 5,
+          reward: 50,
+          label: "L",
+          typeAchievement: { id: "t1", label: "points", data: "{}" },
+        },
+      ];
+      Redis.get
+        .mockResolvedValueOnce([achievedItem])
+        .mockResolvedValueOnce(definitions);
+      Redis.acquireLock.mockResolvedValue("token");
+      Redis.set.mockResolvedValue(undefined);
+      Redis.addToSyncSet.mockResolvedValue(undefined);
+      Redis.storeSyncData.mockResolvedValue(undefined);
+      Redis.releaseLock.mockResolvedValue(undefined);
+      BadgeService.tryGrantBadge.mockResolvedValue(undefined);
+
+      const u = new UserAchievement(
+        "a1",
+        "T",
+        "D",
+        5,
+        50,
+        "L",
+        { id: "t1", label: "points", data: "{}" },
+        { ...achievedItem, count: 5, finished: true },
+        "ch1",
+      );
+
+      await CacheDbService.update(u);
+
+      expect(BadgeService.tryGrantBadge).toHaveBeenCalledWith("u1", "ch1");
     });
 
     it("does not store rewardToAdd when finished was already true", async () => {
