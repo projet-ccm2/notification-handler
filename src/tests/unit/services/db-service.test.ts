@@ -117,4 +117,56 @@ describe("DbService", () => {
       }),
     ).rejects.toThrow("HTTP 404");
   });
+
+  it("getUser returns user from API", async () => {
+    const user = {
+      id: "u1",
+      username: "user1",
+      profileImageUrl: null,
+      channelDescription: null,
+      scope: null,
+      lastUpdateTimestamp: "2026-02-20T12:00:00.000Z",
+    };
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(user),
+    });
+
+    const result = await DbService.getUser("u1");
+    expect(result).toEqual(user);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/users/u1"),
+      expect.any(Object),
+    );
+  });
+
+  it("addExpToUser fetches user and PUTs with increased exp", async () => {
+    const user = {
+      id: "u1",
+      username: "user1",
+      profileImageUrl: null,
+      channelDescription: null,
+      scope: null,
+      lastUpdateTimestamp: "2026-02-20T12:00:00.000Z",
+      exp: 10,
+    };
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(user),
+      })
+      .mockResolvedValueOnce({ ok: true });
+
+    await DbService.addExpToUser("u1", 50);
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("/users/u1"),
+      expect.any(Object),
+    );
+    const putCall = mockFetch.mock.calls[1];
+    expect(putCall[0]).toContain("/users/u1");
+    expect(JSON.parse(putCall[1].body)).toEqual({ ...user, exp: 60 });
+  });
 });

@@ -17,6 +17,8 @@ jest.mock("../../../services/db-service", () => ({
     getUserAchievements: jest.fn(),
     getAchievements: jest.fn(),
     putAchieved: jest.fn(),
+    getUser: jest.fn(),
+    addExpToUser: jest.fn(),
   },
 }));
 
@@ -250,6 +252,7 @@ describe("CacheDbService branches", () => {
 
       await CacheDbService.refreshExpiredCacheEntries();
 
+      expect(DbService.addExpToUser).not.toHaveBeenCalled();
       expect(DbService.putAchieved).toHaveBeenCalledWith(
         expect.objectContaining({
           achievementId: "a2",
@@ -263,6 +266,44 @@ describe("CacheDbService branches", () => {
       );
       expect(Redis.removeFromSyncSet).toHaveBeenCalledWith(
         "user_achieved:u2:ch2",
+      );
+    });
+
+    it("calls addExpToUser when rewardToAdd is present in sync data", async () => {
+      Redis.getPendingSyncKeys.mockResolvedValue(["user_achieved:u3:ch3"]);
+      Redis.acquireLock.mockResolvedValue("token");
+      Redis.getTtl.mockResolvedValue(-1);
+      Redis.exists.mockResolvedValue(false);
+      Redis.getAllSyncDataForCacheKey.mockResolvedValue([
+        {
+          userId: "u3",
+          achievementId: "a3",
+          data: {
+            count: 10,
+            finished: true,
+            labelActive: false,
+            acquiredDate: "2025-01-15",
+            rewardToAdd: 100,
+          },
+        },
+      ]);
+      Redis.deleteAllSyncDataForCacheKey.mockResolvedValue(undefined);
+      Redis.removeFromSyncSet.mockResolvedValue(undefined);
+      Redis.exists.mockResolvedValueOnce(false).mockResolvedValueOnce(false);
+      Redis.releaseLock.mockResolvedValue(undefined);
+      DbService.addExpToUser.mockResolvedValue(undefined);
+      DbService.putAchieved.mockResolvedValue(undefined);
+
+      await CacheDbService.refreshExpiredCacheEntries();
+
+      expect(DbService.addExpToUser).toHaveBeenCalledWith("u3", 100);
+      expect(DbService.putAchieved).toHaveBeenCalledWith(
+        expect.objectContaining({
+          achievementId: "a3",
+          userId: "u3",
+          count: 10,
+          finished: true,
+        }),
       );
     });
 
@@ -397,6 +438,84 @@ describe("CacheDbService branches", () => {
       expect(DbService.getUserAchievements).toHaveBeenCalledWith("u1", "ch1");
       expect(Redis.set).toHaveBeenCalled();
       expect(Redis.addToSyncSet).toHaveBeenCalledWith("user_achieved:u1:ch1");
+    });
+
+    it("stores rewardToAdd in syncData when finished transitions from false to true", async () => {
+      const achievedItem = {
+        achievementId: "a1",
+        userId: "u1",
+        count: 4,
+        finished: false,
+        labelActive: false,
+        acquiredDate: "2025-01-01",
+      };
+      Redis.get.mockResolvedValue([achievedItem]);
+      Redis.acquireLock.mockResolvedValue("token");
+      Redis.set.mockResolvedValue(undefined);
+      Redis.addToSyncSet.mockResolvedValue(undefined);
+      Redis.storeSyncData.mockResolvedValue(undefined);
+      Redis.releaseLock.mockResolvedValue(undefined);
+
+      const u = new UserAchievement(
+        "a1",
+        "T",
+        "D",
+        5,
+        50,
+        "L",
+        { id: "t1", label: "points", data: "{}" },
+        { ...achievedItem, count: 5, finished: true },
+        "ch1",
+      );
+
+      await CacheDbService.update(u);
+
+      expect(Redis.storeSyncData).toHaveBeenCalledWith(
+        "user_achieved:u1:ch1",
+        expect.objectContaining({
+          userId: "u1",
+          achievementId: "a1",
+          data: expect.objectContaining({
+            count: 5,
+            finished: true,
+            rewardToAdd: 50,
+          }),
+        }),
+      );
+    });
+
+    it("does not store rewardToAdd when finished was already true", async () => {
+      const achievedItem = {
+        achievementId: "a1",
+        userId: "u1",
+        count: 5,
+        finished: true,
+        labelActive: false,
+        acquiredDate: "2025-01-01",
+      };
+      Redis.get.mockResolvedValue([achievedItem]);
+      Redis.acquireLock.mockResolvedValue("token");
+      Redis.set.mockResolvedValue(undefined);
+      Redis.addToSyncSet.mockResolvedValue(undefined);
+      Redis.storeSyncData.mockResolvedValue(undefined);
+      Redis.releaseLock.mockResolvedValue(undefined);
+
+      const u = new UserAchievement(
+        "a1",
+        "T",
+        "D",
+        5,
+        50,
+        "L",
+        { id: "t1", label: "points", data: "{}" },
+        achievedItem,
+        "ch1",
+      );
+
+      await CacheDbService.update(u);
+
+      const storeSyncDataCall = Redis.storeSyncData.mock.calls[0][1];
+      expect(storeSyncDataCall.data).not.toHaveProperty("rewardToAdd");
     });
   });
 
