@@ -2,6 +2,7 @@ import { config } from "../config/environment";
 import {
   AchievementWithType,
   CachedUserAchievement,
+  User,
   UserAchievementsResponse,
 } from "../types";
 
@@ -54,5 +55,18 @@ export class DbService {
     acquiredDate: string;
   }): Promise<void> {
     await putJson(`${config.dbGateway.baseUrl}/achieved`, body);
+  }
+
+  static async getUser(userId: string): Promise<User> {
+    return fetchJson<User>(`${config.dbGateway.baseUrl}/users/${userId}`);
+  }
+
+  static async addExpToUser(userId: string, amount: number): Promise<void> {
+    const user = await this.getUser(userId);
+    const currentExp = user.exp ?? 0;
+    await putJson(`${config.dbGateway.baseUrl}/users/${userId}`, {
+      ...user,
+      exp: currentExp + amount,
+    });
   }
 }

@@ -4,8 +4,8 @@ import { DbService } from "./db-service";
 import {
   AchievementWithType,
   Achieved,
+  SyncDataForAchievement,
   TypeAchievement,
-  UpdateUserAchievementRequest,
   UserAchievement,
 } from "../types";
 
@@ -208,6 +208,9 @@ export class CacheDbService {
         const idx = achievedList.findIndex(
           (a) => a.achievementId === userAchievement.id,
         );
+        const previousAchieved = idx >= 0 ? achievedList[idx] : undefined;
+        const isNewCompletion =
+          previousAchieved?.finished === false && updated.finished === true;
         const newList =
           idx >= 0
             ? achievedList.map((a, i) => (i === idx ? updated : a))
@@ -223,6 +226,7 @@ export class CacheDbService {
             finished: updated.finished,
             labelActive: updated.labelActive,
             acquiredDate: updated.acquiredDate,
+            ...(isNewCompletion && { rewardToAdd: userAchievement.reward }),
           },
         });
         return;
@@ -260,10 +264,17 @@ export class CacheDbService {
         }
 
         for (const syncData of syncDataList) {
+          const data = syncData.data as SyncDataForAchievement;
+          if (data.rewardToAdd != null) {
+            await DbService.addExpToUser(syncData.userId, data.rewardToAdd);
+          }
           await DbService.putAchieved({
             achievementId: syncData.achievementId,
             userId: syncData.userId,
-            ...(syncData.data as UpdateUserAchievementRequest),
+            count: data.count,
+            finished: data.finished,
+            labelActive: data.labelActive,
+            acquiredDate: data.acquiredDate,
           });
         }
 

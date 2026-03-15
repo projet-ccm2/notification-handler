@@ -4,3 +4,7 @@ export interface UpdateUserAchievementRequest {
   labelActive: boolean;
   acquiredDate: string;
 }
+
+export interface SyncDataForAchievement extends UpdateUserAchievementRequest {
+  rewardToAdd?: number;
+}
