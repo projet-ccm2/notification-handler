@@ -179,6 +179,25 @@ export class CacheDbService {
     }
   }
 
+  private static async tryGrantBadgeIfNewCompletion(
+    userId: string,
+    channelId: string,
+    newList: Achieved[],
+  ): Promise<void> {
+    let definitions =
+      await RedisService.get<AchievementWithType[]>(
+        this.buildAchievementsCacheKey(channelId),
+      );
+    definitions ??= await DbService.getAchievements(channelId);
+    const allFinished = definitions.every(
+      (def) =>
+        newList.find((a) => a.achievementId === def.id)?.finished === true,
+    );
+    if (allFinished) {
+      await BadgeService.tryGrantBadge(userId, channelId);
+    }
+  }
+
   static async update(userAchievement: UserAchievement): Promise<void> {
     if (!userAchievement.achieved)
       throw new Error("UserAchievement.achieved is required for update");
@@ -198,11 +217,14 @@ export class CacheDbService {
 
       try {
         let achievedList = await RedisService.get<Achieved[]>(cacheKey);
-
         if (achievedList === null) {
-          const typeLabel = userAchievement.typeAchievement.label;
-          await this.getAchievements(channelId, userId, typeLabel);
-          achievedList = (await RedisService.get<Achieved[]>(cacheKey)) ?? [];
+          await this.getAchievements(
+            channelId,
+            userId,
+            userAchievement.typeAchievement.label,
+          );
+          achievedList =
+            (await RedisService.get<Achieved[]>(cacheKey)) ?? [];
         }
 
         const updated = userAchievement.toCacheAchieved();
@@ -232,21 +254,7 @@ export class CacheDbService {
         });
 
         if (isNewCompletion) {
-          let definitions = await RedisService.get<AchievementWithType[]>(
-            this.buildAchievementsCacheKey(channelId),
-          );
-          if (!definitions) {
-            definitions = await DbService.getAchievements(channelId);
-          }
-          const allFinished =
-            definitions?.every(
-              (def) =>
-                newList.find((a) => a.achievementId === def.id)?.finished ===
-                true,
-            ) ?? false;
-          if (allFinished) {
-            await BadgeService.tryGrantBadge(userId, channelId);
-          }
+          await this.tryGrantBadgeIfNewCompletion(userId, channelId, newList);
         }
         return;
       } finally {
