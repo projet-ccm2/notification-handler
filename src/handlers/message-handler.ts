@@ -81,10 +81,10 @@ export class MessageHandler {
       })),
     });
     const lowercaseMessage = message.toLowerCase();
-    let achievementLabelLowercase: string;
+    let typeDataLowercase: string;
     for (const ua of achievements) {
-      achievementLabelLowercase = ua.label.toLowerCase();
-      if (lowercaseMessage.includes(achievementLabelLowercase)) {
+      typeDataLowercase = ua.typeAchievement.data.toLowerCase();
+      if (lowercaseMessage.includes(typeDataLowercase)) {
         ua.achieved.count += 1;
         ua.achieved.finished = ua.achieved.count >= ua.goal;
         await CacheDbService.update(ua);

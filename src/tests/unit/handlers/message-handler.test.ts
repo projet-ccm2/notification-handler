@@ -160,7 +160,7 @@ describe("MessageHandler", () => {
   });
 
   describe("handleMessageContent", () => {
-    it("increments achievement when message includes label", async () => {
+    it("increments achievement when message includes typeAchievement data", async () => {
       const ua = new UserAchievement(
         "a1",
         "Say hello",
@@ -168,7 +168,7 @@ describe("MessageHandler", () => {
         3,
         30,
         "Hello",
-        { id: "t1", label: "contentMessage", data: "{}" },
+        { id: "t1", label: "contentMessage", data: "Hello" },
         UserAchievement.defaultAchieved("a1", "u1"),
         "ch1",
       );
@@ -181,7 +181,7 @@ describe("MessageHandler", () => {
       expect(CacheDbService.update).toHaveBeenCalledWith(ua);
     });
 
-    it("does not update when message does not include label", async () => {
+    it("does not update when message does not include typeAchievement data", async () => {
       const ua = new UserAchievement(
         "a1",
         "Say hello",
@@ -189,7 +189,7 @@ describe("MessageHandler", () => {
         3,
         30,
         "hello",
-        { id: "t1", label: "contentMessage", data: "{}" },
+        { id: "t1", label: "contentMessage", data: "hello" },
         UserAchievement.defaultAchieved("a1", "u1"),
         "ch1",
       );
@@ -201,7 +201,7 @@ describe("MessageHandler", () => {
       expect(CacheDbService.update).not.toHaveBeenCalled();
     });
 
-    it("matches label case-insensitively", async () => {
+    it("matches typeAchievement data case-insensitively", async () => {
       const ua = new UserAchievement(
         "a1",
         "Say hello",
@@ -209,7 +209,7 @@ describe("MessageHandler", () => {
         3,
         30,
         "HELLO",
-        { id: "t1", label: "contentMessage", data: "{}" },
+        { id: "t1", label: "contentMessage", data: "HELLO" },
         UserAchievement.defaultAchieved("a1", "u1"),
         "ch1",
       );
