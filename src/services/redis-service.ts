@@ -129,11 +129,7 @@ export class RedisService {
   ): Promise<void> {
     const syncKey = `sync:data:${cacheKey}:${syncData.achievementId}`;
     await this.execute((c) =>
-      c.setEx(
-        this.prefixKey(syncKey),
-        config.cache.ttl + 60,
-        JSON.stringify(syncData),
-      ),
+      c.set(this.prefixKey(syncKey), JSON.stringify(syncData)),
     );
   }
 
