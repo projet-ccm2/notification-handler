@@ -233,6 +233,9 @@ export class CacheDbService {
         const previousAchieved = idx >= 0 ? achievedList[idx] : undefined;
         const isNewCompletion =
           previousAchieved?.finished === false && updated.finished === true;
+        if (updated.finished && !updated.acquiredDate) {
+          updated.acquiredDate = new Date().toISOString();
+        }
         const newList =
           idx >= 0
             ? achievedList.map((a, i) => (i === idx ? updated : a))
