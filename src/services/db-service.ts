@@ -7,6 +7,7 @@ import {
   User,
   UserAchievementsResponse,
 } from "../types";
+import { logger } from "../utils/logger";
 
 const fetchJson = async <T>(url: string): Promise<T> => {
   const response = await fetch(url, {
@@ -30,10 +31,17 @@ const fetchJsonOrNull = async <T>(url: string): Promise<T | null> => {
 };
 
 const putJson = async (url: string, body: object): Promise<void> => {
+  logger.debug("DB Gateway PUT request", { url, body });
   const response = await fetch(url, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+  });
+  const responseText = await response.text();
+  logger.debug("DB Gateway PUT response", {
+    url,
+    status: response.status,
+    body: responseText,
   });
   if (!response.ok)
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);

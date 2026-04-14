@@ -40,6 +40,17 @@ export class MessageHandler {
       userId,
       COUNT_MESSAGE_TYPE,
     );
+    logger.debug("Count message achievements found", {
+      userId,
+      channelId,
+      count: achievements.length,
+      achievements: achievements.map((a) => ({
+        id: a.id,
+        goal: a.goal,
+        currentCount: a.achieved?.count,
+        finished: a.achieved?.finished,
+      })),
+    });
     for (const ua of achievements) {
       ua.achieved.count += 1;
       ua.achieved.finished = ua.achieved.count >= ua.goal;
@@ -57,6 +68,18 @@ export class MessageHandler {
       userId,
       CONTENT_MESSAGE_TYPE,
     );
+    logger.debug("Content message achievements found", {
+      userId,
+      channelId,
+      count: achievements.length,
+      achievements: achievements.map((a) => ({
+        id: a.id,
+        label: a.label,
+        goal: a.goal,
+        currentCount: a.achieved?.count,
+        finished: a.achieved?.finished,
+      })),
+    });
     const lowercaseMessage = message.toLowerCase();
     let achievementLabelLowercase: string;
     for (const ua of achievements) {
