@@ -53,7 +53,7 @@ if (config.nodeEnv !== "test") {
     clearInterval(syncInterval);
     try {
       logger.debug("Flushing pending sync data before shutdown");
-      await CacheDbService.refreshExpiredCacheEntries();
+      await CacheDbService.refreshExpiredCacheEntries(true);
       logger.debug("Flush complete, disconnecting Redis");
       await RedisService.disconnect();
       server.close(() => {
