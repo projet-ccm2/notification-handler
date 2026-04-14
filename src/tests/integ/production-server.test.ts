@@ -16,7 +16,7 @@ jest.mock("../../config/environment", () => ({
     cors: { allowedOrigins: [] },
     dbGateway: { baseUrl: "http://localhost:8080" },
     redis: { url: "redis://localhost:6379" },
-    cache: { ttl: 3600 },
+    cache: { ttl: 3600, syncIntervalMs: 60000 },
   },
 }));
 
@@ -24,6 +24,12 @@ jest.mock("../../services/redis-service", () => ({
   RedisService: {
     connect: jest.fn().mockResolvedValue(undefined),
     disconnect: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
+jest.mock("../../services/cache-db-service", () => ({
+  CacheDbService: {
+    refreshExpiredCacheEntries: jest.fn().mockResolvedValue(undefined),
   },
 }));
 
