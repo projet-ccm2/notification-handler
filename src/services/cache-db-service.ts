@@ -2,6 +2,7 @@ import { config } from "../config/environment";
 import { RedisService } from "./redis-service";
 import { DbService } from "./db-service";
 import { BadgeService } from "./badge-service";
+import { logger } from "../utils/logger";
 import {
   AchievementWithType,
   Achieved,
@@ -280,10 +281,13 @@ export class CacheDbService {
 
         if (ttl > 0 && exists) continue;
 
+        logger.debug("Cache TTL expired, starting flush to DB", { cacheKey, ttl });
+
         const syncDataList =
           await RedisService.getAllSyncDataForCacheKey(cacheKey);
 
         if (syncDataList.length === 0) {
+          logger.debug("No sync data to flush, removing from sync set", { cacheKey });
           await RedisService.removeFromSyncSet(cacheKey);
           continue;
         }
@@ -291,8 +295,10 @@ export class CacheDbService {
         for (const syncData of syncDataList) {
           const data = syncData.data as SyncDataForAchievement;
           if (data.rewardToAdd != null) {
+            logger.debug("Flushing exp to DB gateway", { userId: syncData.userId, rewardToAdd: data.rewardToAdd });
             await DbService.addExpToUser(syncData.userId, data.rewardToAdd);
           }
+          logger.debug("Flushing achieved to DB gateway", { userId: syncData.userId, achievementId: syncData.achievementId });
           await DbService.putAchieved({
             achievementId: syncData.achievementId,
             userId: syncData.userId,
@@ -303,6 +309,7 @@ export class CacheDbService {
           });
         }
 
+        logger.debug("Flush complete, cleaning up sync data", { cacheKey, syncedCount: syncDataList.length });
         await RedisService.deleteAllSyncDataForCacheKey(cacheKey);
         await RedisService.removeFromSyncSet(cacheKey);
         if (await RedisService.exists(cacheKey))

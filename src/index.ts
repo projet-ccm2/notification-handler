@@ -4,6 +4,7 @@ import { logger } from "./utils/logger";
 import eventRoutes from "./routes/event-routes";
 import cacheRoutes from "./routes/cache-routes";
 import { RedisService } from "./services";
+import { CacheDbService } from "./services/cache-db-service";
 
 const app = express();
 app.disable("x-powered-by");
@@ -37,9 +38,23 @@ if (config.nodeEnv !== "test") {
     }
   });
 
+  const syncInterval = setInterval(async () => {
+    try {
+      await CacheDbService.refreshExpiredCacheEntries();
+    } catch (error) {
+      logger.error("Failed to refresh expired cache entries", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, config.cache.syncIntervalMs);
+
   const gracefulShutdown = async (signal: string) => {
     logger.info(`${signal} received, shutting down gracefully`);
+    clearInterval(syncInterval);
     try {
+      logger.debug("Flushing pending sync data before shutdown");
+      await CacheDbService.refreshExpiredCacheEntries();
+      logger.debug("Flush complete, disconnecting Redis");
       await RedisService.disconnect();
       server.close(() => {
         logger.info("Server closed");
