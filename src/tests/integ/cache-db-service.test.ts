@@ -170,7 +170,7 @@ describe("CacheDbService (Testcontainers Redis)", () => {
       jest
         .spyOn(DbService.DbService, "getUserAchievements")
         .mockResolvedValue(mockAchievementsFromApi);
-      jest.spyOn(DbService.DbService, "putAchieved").mockResolvedValue();
+      jest.spyOn(DbService.DbService, "saveAchieved").mockResolvedValue();
 
       await CacheDbService.getAchievements("ch4", "user1", "points");
       const toUpdate = (
@@ -191,7 +191,7 @@ describe("CacheDbService (Testcontainers Redis)", () => {
 
       await CacheDbService.refreshExpiredCacheEntries();
 
-      expect(DbService.DbService.putAchieved).not.toHaveBeenCalled();
+      expect(DbService.DbService.saveAchieved).not.toHaveBeenCalled();
     });
   });
 });

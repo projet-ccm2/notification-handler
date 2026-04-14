@@ -313,7 +313,7 @@ export class CacheDbService {
             userId: syncData.userId,
             achievementId: syncData.achievementId,
           });
-          await DbService.putAchieved({
+          await DbService.saveAchieved({
             achievementId: syncData.achievementId,
             userId: syncData.userId,
             count: data.count,

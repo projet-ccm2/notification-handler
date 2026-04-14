@@ -16,7 +16,7 @@ jest.mock("../../../services/db-service", () => ({
   DbService: {
     getUserAchievements: jest.fn(),
     getAchievements: jest.fn(),
-    putAchieved: jest.fn(),
+    saveAchieved: jest.fn(),
     getUser: jest.fn(),
     addExpToUser: jest.fn(),
     getChannelBadge: jest.fn(),
@@ -235,10 +235,10 @@ describe("CacheDbService branches", () => {
       expect(Redis.removeFromSyncSet).toHaveBeenCalledWith(
         "user_achieved:u1:ch1",
       );
-      expect(DbService.putAchieved).not.toHaveBeenCalled();
+      expect(DbService.saveAchieved).not.toHaveBeenCalled();
     });
 
-    it("calls putAchieved and cleans up when cache expired and sync data exists", async () => {
+    it("calls saveAchieved and cleans up when cache expired and sync data exists", async () => {
       Redis.getPendingSyncKeys.mockResolvedValue(["user_achieved:u2:ch2"]);
       Redis.acquireLock.mockResolvedValue("token");
       Redis.getTtl.mockResolvedValue(0);
@@ -263,7 +263,7 @@ describe("CacheDbService branches", () => {
       await CacheDbService.refreshExpiredCacheEntries();
 
       expect(DbService.addExpToUser).not.toHaveBeenCalled();
-      expect(DbService.putAchieved).toHaveBeenCalledWith(
+      expect(DbService.saveAchieved).toHaveBeenCalledWith(
         expect.objectContaining({
           achievementId: "a2",
           userId: "u2",
@@ -302,12 +302,12 @@ describe("CacheDbService branches", () => {
       Redis.exists.mockResolvedValueOnce(false).mockResolvedValueOnce(false);
       Redis.releaseLock.mockResolvedValue(undefined);
       DbService.addExpToUser.mockResolvedValue(undefined);
-      DbService.putAchieved.mockResolvedValue(undefined);
+      DbService.saveAchieved.mockResolvedValue(undefined);
 
       await CacheDbService.refreshExpiredCacheEntries();
 
       expect(DbService.addExpToUser).toHaveBeenCalledWith("u3", 100);
-      expect(DbService.putAchieved).toHaveBeenCalledWith(
+      expect(DbService.saveAchieved).toHaveBeenCalledWith(
         expect.objectContaining({
           achievementId: "a3",
           userId: "u3",
@@ -324,7 +324,7 @@ describe("CacheDbService branches", () => {
       await CacheDbService.refreshExpiredCacheEntries();
 
       expect(Redis.getTtl).not.toHaveBeenCalled();
-      expect(DbService.putAchieved).not.toHaveBeenCalled();
+      expect(DbService.saveAchieved).not.toHaveBeenCalled();
     });
 
     it("continues when ttl > 0 and exists", async () => {
@@ -337,7 +337,7 @@ describe("CacheDbService branches", () => {
       await CacheDbService.refreshExpiredCacheEntries();
 
       expect(Redis.getAllSyncDataForCacheKey).not.toHaveBeenCalled();
-      expect(DbService.putAchieved).not.toHaveBeenCalled();
+      expect(DbService.saveAchieved).not.toHaveBeenCalled();
     });
 
     it("deletes cache key when it still exists after sync", async () => {

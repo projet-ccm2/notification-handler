@@ -77,7 +77,17 @@ export class DbService {
     return res.achievements;
   }
 
-  static async putAchieved(body: {
+  static async getAchieved(
+    achievementId: string,
+    userId: string,
+  ): Promise<object | null> {
+    const params = new URLSearchParams({ achievementId, userId });
+    return fetchJsonOrNull<object>(
+      `${config.dbGateway.baseUrl}/achieved?${params}`,
+    );
+  }
+
+  static async saveAchieved(body: {
     achievementId: string;
     userId: string;
     count: number;
@@ -85,7 +95,12 @@ export class DbService {
     labelActive: boolean;
     acquiredDate: string;
   }): Promise<void> {
-    await putJson(`${config.dbGateway.baseUrl}/achieved`, body);
+    const existing = await this.getAchieved(body.achievementId, body.userId);
+    if (existing) {
+      await putJson(`${config.dbGateway.baseUrl}/achieved`, body);
+    } else {
+      await postJson(`${config.dbGateway.baseUrl}/achieved`, body);
+    }
   }
 
   static async getUser(userId: string): Promise<User> {

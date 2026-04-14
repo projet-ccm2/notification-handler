@@ -70,10 +70,15 @@ describe("DbService", () => {
     );
   });
 
-  it("putAchieved sends PUT request", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true });
+  it("saveAchieved sends PUT when record exists", async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ achievementId: "a1", userId: "u1" }),
+      })
+      .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve("") });
 
-    await DbService.putAchieved({
+    await DbService.saveAchieved({
       achievementId: "a1",
       userId: "u1",
       count: 1,
@@ -82,12 +87,33 @@ describe("DbService", () => {
       acquiredDate: "2025-01-01",
     });
 
-    expect(mockFetch).toHaveBeenCalledWith(
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
       expect.stringContaining("/achieved"),
-      expect.objectContaining({
-        method: "PUT",
-        body: expect.any(String),
-      }),
+      expect.objectContaining({ method: "PUT" }),
+    );
+  });
+
+  it("saveAchieved sends POST when record does not exist", async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: false, status: 404, statusText: "Not Found" })
+      .mockResolvedValueOnce({ ok: true });
+
+    await DbService.saveAchieved({
+      achievementId: "a1",
+      userId: "u1",
+      count: 1,
+      finished: false,
+      labelActive: false,
+      acquiredDate: "2025-01-01",
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("/achieved"),
+      expect.objectContaining({ method: "POST" }),
     );
   });
 
@@ -98,24 +124,6 @@ describe("DbService", () => {
       statusText: "Server Error",
     });
     await expect(DbService.getAchievements("ch1")).rejects.toThrow("HTTP 500");
-  });
-
-  it("putAchieved throws when response not ok", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      statusText: "Not Found",
-    });
-    await expect(
-      DbService.putAchieved({
-        achievementId: "a1",
-        userId: "u1",
-        count: 0,
-        finished: false,
-        labelActive: false,
-        acquiredDate: "",
-      }),
-    ).rejects.toThrow("HTTP 404");
   });
 
   it("getUser returns user from API", async () => {
@@ -155,7 +163,7 @@ describe("DbService", () => {
         ok: true,
         json: () => Promise.resolve(user),
       })
-      .mockResolvedValueOnce({ ok: true });
+      .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve("") });
 
     await DbService.addExpToUser("u1", 50);
 
