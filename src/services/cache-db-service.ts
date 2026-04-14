@@ -266,7 +266,7 @@ export class CacheDbService {
     );
   }
 
-  static async refreshExpiredCacheEntries(): Promise<void> {
+  static async refreshExpiredCacheEntries(force = false): Promise<void> {
     const pendingKeys = await RedisService.getPendingSyncKeys();
 
     for (const cacheKey of pendingKeys) {
@@ -279,7 +279,7 @@ export class CacheDbService {
         const ttl = await RedisService.getTtl(cacheKey);
         const exists = await RedisService.exists(cacheKey);
 
-        if (ttl > 0 && exists) continue;
+        if (!force && ttl > 0 && exists) continue;
 
         logger.debug("Cache TTL expired, starting flush to DB", {
           cacheKey,

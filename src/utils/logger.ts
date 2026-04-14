@@ -7,7 +7,7 @@ const logger = winston.createLogger({
     winston.format.errors({ stack: true }),
     winston.format.json(),
   ),
-  defaultMeta: { service: "IA-manager" },
+  defaultMeta: { service: "Notification-handler" },
   transports: [
     new winston.transports.Console({
       format: winston.format.combine(
