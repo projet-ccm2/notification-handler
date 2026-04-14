@@ -33,7 +33,10 @@ function validateConfig(): Config {
     },
     cache: {
       ttl: Number.parseInt(process.env.CACHE_TTL || "3600", 10),
-      syncIntervalMs: Number.parseInt(process.env.CACHE_SYNC_INTERVAL_MS || "300", 10),
+      syncIntervalMs: Number.parseInt(
+        process.env.CACHE_SYNC_INTERVAL_MS || "300",
+        10,
+      ),
     },
   };
 }
