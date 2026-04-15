@@ -97,7 +97,11 @@ describe("DbService", () => {
 
   it("saveAchieved sends POST when record does not exist", async () => {
     mockFetch
-      .mockResolvedValueOnce({ ok: false, status: 404, statusText: "Not Found" })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+      })
       .mockResolvedValueOnce({ ok: true });
 
     await DbService.saveAchieved({

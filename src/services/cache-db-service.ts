@@ -340,8 +340,7 @@ export class CacheDbService {
           cacheKey,
           syncedCount: syncDataList.length,
         });
-        const syncKeys =
-          await RedisService.getSyncDataKeys(cacheKey);
+        const syncKeys = await RedisService.getSyncDataKeys(cacheKey);
         await RedisService.execPipeline((p) => {
           for (const k of syncKeys) {
             p.del(RedisService.buildKey(k));
