@@ -14,6 +14,10 @@ export class RedisService {
     return `${config.nodeEnv}:${key}`;
   }
 
+  static buildKey(key: string): string {
+    return this.prefixKey(key);
+  }
+
   private static stripPrefix(key: string): string {
     const prefix = `${config.nodeEnv}:`;
     return key.startsWith(prefix) ? key.slice(prefix.length) : key;
@@ -58,6 +62,11 @@ export class RedisService {
   static async get<T>(key: string): Promise<T | null> {
     const value = await this.execute((c) => c.get(this.prefixKey(key)));
     return value ? (JSON.parse(value) as T) : null;
+  }
+
+  static async mGet(keys: string[]): Promise<(string | null)[]> {
+    if (keys.length === 0) return [];
+    return this.execute((c) => c.mGet(keys.map((k) => this.prefixKey(k))));
   }
 
   static async set(
@@ -162,22 +171,33 @@ export class RedisService {
   ): Promise<Array<{ userId: string; achievementId: string; data: unknown }>> {
     const pattern = `sync:data:${cacheKey}:*`;
     const keys = await this.scanKeys(pattern);
-    const syncDataArray = [];
+    if (keys.length === 0) return [];
 
-    for (const key of keys) {
-      const value = await this.execute((c) => c.get(this.prefixKey(key)));
-      if (value) syncDataArray.push(JSON.parse(value));
-    }
+    const values = await this.mGet(keys);
+    return values
+      .filter((v): v is string => v !== null)
+      .map((v) => JSON.parse(v));
+  }
 
-    return syncDataArray;
+  static async getSyncDataKeys(cacheKey: string): Promise<string[]> {
+    return this.scanKeys(`sync:data:${cacheKey}:*`);
   }
 
   static async deleteAllSyncDataForCacheKey(cacheKey: string): Promise<void> {
-    const pattern = `sync:data:${cacheKey}:*`;
-    const keys = await this.scanKeys(pattern);
+    const keys = await this.getSyncDataKeys(cacheKey);
     if (keys.length > 0) {
       await this.execute((c) => c.del(keys.map((k) => this.prefixKey(k))));
     }
+  }
+
+  static async execPipeline(
+    buildPipeline: (pipeline: ReturnType<RedisClientType["multi"]>) => void,
+  ): Promise<void> {
+    await this.execute((c) => {
+      const pipeline = c.multi();
+      buildPipeline(pipeline);
+      return pipeline.exec();
+    });
   }
 
   static async acquireLock(

@@ -64,10 +64,13 @@ export class CacheDbService {
     typeAchievement: string,
     userId: string,
   ): Promise<UserAchievement[] | null> {
-    const defs =
-      await RedisService.get<AchievementWithType[]>(cacheKeyAchievements);
-    const achieved = await RedisService.get<Achieved[]>(cacheKeyUser);
-    if (!defs || achieved === null) return null;
+    const [rawDefs, rawAchieved] = await RedisService.mGet([
+      cacheKeyAchievements,
+      cacheKeyUser,
+    ]);
+    if (!rawDefs || rawAchieved === null) return null;
+    const defs = JSON.parse(rawDefs) as AchievementWithType[];
+    const achieved = JSON.parse(rawAchieved) as Achieved[];
     return this.mergeAndFilter(
       defs,
       achieved,
@@ -241,9 +244,7 @@ export class CacheDbService {
             ? achievedList.map((a, i) => (i === idx ? updated : a))
             : [...achievedList, updated];
 
-        await RedisService.set(cacheKey, newList, this.CACHE_TTL);
-        await RedisService.addToSyncSet(cacheKey);
-        await RedisService.storeSyncData(cacheKey, {
+        const syncData = JSON.stringify({
           userId,
           achievementId: userAchievement.id,
           data: {
@@ -253,6 +254,19 @@ export class CacheDbService {
             acquiredDate: updated.acquiredDate,
             ...(isNewCompletion && { rewardToAdd: userAchievement.reward }),
           },
+        });
+        const syncKey = `sync:data:${cacheKey}:${userAchievement.id}`;
+        await RedisService.execPipeline((p) => {
+          p.setEx(
+            RedisService.buildKey(cacheKey),
+            this.CACHE_TTL,
+            JSON.stringify(newList),
+          );
+          p.sAdd(
+            RedisService.buildKey("sync:pending"),
+            RedisService.buildKey(cacheKey),
+          );
+          p.set(RedisService.buildKey(syncKey), syncData);
         });
 
         if (isNewCompletion) {
@@ -280,9 +294,8 @@ export class CacheDbService {
 
       try {
         const ttl = await RedisService.getTtl(cacheKey);
-        const exists = await RedisService.exists(cacheKey);
 
-        if (!force && ttl > 0 && exists) continue;
+        if (!force && ttl > 0) continue;
 
         logger.debug("Cache TTL expired, starting flush to DB", {
           cacheKey,
@@ -327,10 +340,18 @@ export class CacheDbService {
           cacheKey,
           syncedCount: syncDataList.length,
         });
-        await RedisService.deleteAllSyncDataForCacheKey(cacheKey);
-        await RedisService.removeFromSyncSet(cacheKey);
-        if (await RedisService.exists(cacheKey))
-          await RedisService.delete(cacheKey);
+        const syncKeys =
+          await RedisService.getSyncDataKeys(cacheKey);
+        await RedisService.execPipeline((p) => {
+          for (const k of syncKeys) {
+            p.del(RedisService.buildKey(k));
+          }
+          p.sRem(
+            RedisService.buildKey("sync:pending"),
+            RedisService.buildKey(cacheKey),
+          );
+          p.del(RedisService.buildKey(cacheKey));
+        });
       } finally {
         await RedisService.releaseLock(lockKey, lockToken);
       }
@@ -339,19 +360,32 @@ export class CacheDbService {
 
   static async clearCacheByChannelId(channelId: string): Promise<void> {
     const achievementsKey = this.buildAchievementsCacheKey(channelId);
-    await RedisService.delete(achievementsKey);
 
     const userAchievedPattern = `${this.CACHE_PREFIX_USER_ACHIEVED}*:${channelId}`;
     const userAchievedKeys =
       await RedisService.getKeysByPattern(userAchievedPattern);
 
+    const allSyncDataKeys: string[] = [];
     for (const cacheKey of userAchievedKeys) {
-      await RedisService.removeFromSyncSet(cacheKey);
-      await RedisService.deleteAllSyncDataForCacheKey(cacheKey);
-      await RedisService.delete(`read:lock:${cacheKey}`);
-      await RedisService.delete(`lock:${cacheKey}`);
-      await RedisService.delete(`sync:lock:${cacheKey}`);
-      await RedisService.delete(cacheKey);
+      const syncKeys = await RedisService.getSyncDataKeys(cacheKey);
+      allSyncDataKeys.push(...syncKeys);
     }
+
+    await RedisService.execPipeline((p) => {
+      p.del(RedisService.buildKey(achievementsKey));
+      for (const cacheKey of userAchievedKeys) {
+        p.sRem(
+          RedisService.buildKey("sync:pending"),
+          RedisService.buildKey(cacheKey),
+        );
+        p.del(RedisService.buildKey(`read:lock:${cacheKey}`));
+        p.del(RedisService.buildKey(`lock:${cacheKey}`));
+        p.del(RedisService.buildKey(`sync:lock:${cacheKey}`));
+        p.del(RedisService.buildKey(cacheKey));
+      }
+      for (const syncKey of allSyncDataKeys) {
+        p.del(RedisService.buildKey(syncKey));
+      }
+    });
   }
 }
