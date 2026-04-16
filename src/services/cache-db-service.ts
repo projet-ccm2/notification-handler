@@ -235,7 +235,7 @@ export class CacheDbService {
         );
         const previousAchieved = idx >= 0 ? achievedList[idx] : undefined;
         const isNewCompletion =
-          previousAchieved?.finished === false && updated.finished === true;
+          previousAchieved?.finished !== true && updated.finished === true;
         if (updated.finished && !updated.acquiredDate) {
           updated.acquiredDate = new Date().toISOString();
         }
@@ -244,6 +244,16 @@ export class CacheDbService {
             ? achievedList.map((a, i) => (i === idx ? updated : a))
             : [...achievedList, updated];
 
+        const existingSyncData = await RedisService.getSyncData(
+          cacheKey,
+          userAchievement.id,
+        );
+        const preservedReward = (
+          existingSyncData?.data as SyncDataForAchievement
+        )?.rewardToAdd;
+        const rewardToAdd = isNewCompletion
+          ? userAchievement.reward
+          : preservedReward;
         const syncData = JSON.stringify({
           userId,
           achievementId: userAchievement.id,
@@ -252,7 +262,7 @@ export class CacheDbService {
             finished: updated.finished,
             labelActive: updated.labelActive,
             acquiredDate: updated.acquiredDate,
-            ...(isNewCompletion && { rewardToAdd: userAchievement.reward }),
+            ...(rewardToAdd != null && { rewardToAdd }),
           },
         });
         const syncKey = `sync:data:${cacheKey}:${userAchievement.id}`;

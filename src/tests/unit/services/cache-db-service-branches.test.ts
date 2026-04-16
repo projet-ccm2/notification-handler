@@ -691,6 +691,85 @@ describe("CacheDbService branches", () => {
       const syncData = JSON.parse(syncDataArg);
       expect(syncData.data).not.toHaveProperty("rewardToAdd");
     });
+
+    it("stores rewardToAdd when achievement not yet in cache list (idx=-1, first completion)", async () => {
+      Redis.get.mockResolvedValue([]);
+      Redis.getSyncData.mockResolvedValue(null);
+      Redis.acquireLock.mockResolvedValue("token");
+      Redis.releaseLock.mockResolvedValue(undefined);
+
+      const u = new UserAchievement(
+        "a1",
+        "T",
+        "D",
+        1,
+        75,
+        "L",
+        { id: "t1", label: "points", data: "{}" },
+        {
+          achievementId: "a1",
+          userId: "u1",
+          count: 1,
+          finished: true,
+          labelActive: false,
+          acquiredDate: "",
+        },
+        "ch1",
+      );
+
+      await CacheDbService.update(u);
+
+      const pipelineCallback = Redis.execPipeline.mock.calls[0][0];
+      const mockPipeline = { setEx: jest.fn(), sAdd: jest.fn(), set: jest.fn() };
+      pipelineCallback(mockPipeline as any);
+      const syncData = JSON.parse(mockPipeline.set.mock.calls[0][1]);
+      expect(syncData.data.rewardToAdd).toBe(75);
+    });
+
+    it("preserves rewardToAdd on second update when syncData already contains it", async () => {
+      const achievedItem = {
+        achievementId: "a1",
+        userId: "u1",
+        count: 5,
+        finished: true,
+        labelActive: false,
+        acquiredDate: "2025-01-01",
+      };
+      Redis.get.mockResolvedValue([achievedItem]);
+      Redis.getSyncData.mockResolvedValue({
+        userId: "u1",
+        achievementId: "a1",
+        data: {
+          count: 5,
+          finished: true,
+          labelActive: false,
+          acquiredDate: "2025-01-01",
+          rewardToAdd: 50,
+        },
+      });
+      Redis.acquireLock.mockResolvedValue("token");
+      Redis.releaseLock.mockResolvedValue(undefined);
+
+      const u = new UserAchievement(
+        "a1",
+        "T",
+        "D",
+        5,
+        50,
+        "L",
+        { id: "t1", label: "points", data: "{}" },
+        { ...achievedItem, labelActive: true },
+        "ch1",
+      );
+
+      await CacheDbService.update(u);
+
+      const pipelineCallback = Redis.execPipeline.mock.calls[0][0];
+      const mockPipeline = { setEx: jest.fn(), sAdd: jest.fn(), set: jest.fn() };
+      pipelineCallback(mockPipeline as any);
+      const syncData = JSON.parse(mockPipeline.set.mock.calls[0][1]);
+      expect(syncData.data.rewardToAdd).toBe(50);
+    });
   });
 
   describe("clearCacheByChannelId", () => {
