@@ -27,13 +27,15 @@ export class MessageHandler {
       });
       return;
     }
-    await this.handleCountMessages(userId, channelId);
-    await this.handleMessageContent(userId, channelId, payload.message);
+    const ctx = { channelLogin: event.channelLogin, userLogin: event.userLogin };
+    await this.handleCountMessages(userId, channelId, ctx);
+    await this.handleMessageContent(userId, channelId, payload.message, ctx);
   }
 
   static async handleCountMessages(
     userId: string,
     channelId: string,
+    ctx: { channelLogin?: string; userLogin?: string } = {},
   ): Promise<void> {
     const achievements = await CacheDbService.getAchievements(
       channelId,
@@ -54,7 +56,7 @@ export class MessageHandler {
     for (const ua of achievements) {
       ua.achieved.count += 1;
       ua.achieved.finished = ua.achieved.count >= ua.goal;
-      await CacheDbService.update(ua);
+      await CacheDbService.update(ua, ctx);
     }
   }
 
@@ -62,6 +64,7 @@ export class MessageHandler {
     userId: string,
     channelId: string,
     message: string,
+    ctx: { channelLogin?: string; userLogin?: string } = {},
   ): Promise<void> {
     const achievements = await CacheDbService.getAchievements(
       channelId,
@@ -87,7 +90,7 @@ export class MessageHandler {
       if (lowercaseMessage.includes(typeDataLowercase)) {
         ua.achieved.count += 1;
         ua.achieved.finished = ua.achieved.count >= ua.goal;
-        await CacheDbService.update(ua);
+        await CacheDbService.update(ua, ctx);
       }
     }
   }

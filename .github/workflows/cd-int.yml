@@ -22,7 +22,7 @@ jobs:
     uses: projet-ccm2/shared-workflows/.github/workflows/nodejs-cd.yml@main
     if: github.event_name != 'pull_request'
     with:
-      required_env_vars: GCP_SA_KEY,GCP_PROJECT_ID,TWITCH_CLIENT_ID,ALLOWED_ORIGINS,DB_SERVICE_URL,REDIS_URL,CACHE_TTL
+      required_env_vars: GCP_SA_KEY,GCP_PROJECT_ID,TWITCH_CLIENT_ID,ALLOWED_ORIGINS,DB_SERVICE_URL,REDIS_URL,CACHE_TTL,TWITCH_LISTENER_URL,TWITCH_LISTENER_API_KEY,DISCORD_NOTIF_URL
       docker-image-name: notification-handler-api-int
       docker-tag: ${{ github.event.inputs.image-tag || format('dev-{0}', github.sha) }}
       artifact-registry-repository: "notification-handler-docker-int"
@@ -36,3 +36,6 @@ jobs:
       DB_SERVICE_URL: ${{ secrets.INT_DB_SERVICE_URL }}
       REDIS_URL: ${{ secrets.REDIS_URL }}
       CACHE_TTL: ${{ secrets.CACHE_TTL }}
+      TWITCH_LISTENER_URL: ${{ secrets.INT_TWITCH_LISTENER_URL }}
+      TWITCH_LISTENER_API_KEY: ${{ secrets.TWITCH_LISTENER_API_KEY }}
+      DISCORD_NOTIF_URL: ${{ secrets.INT_DISCORD_NOTIF_URL }}

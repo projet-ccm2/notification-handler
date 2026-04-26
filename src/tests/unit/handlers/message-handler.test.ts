@@ -132,7 +132,7 @@ describe("MessageHandler", () => {
 
       expect(ua.achieved.count).toBe(1);
       expect(ua.achieved.finished).toBe(false);
-      expect(CacheDbService.update).toHaveBeenCalledWith(ua);
+      expect(CacheDbService.update).toHaveBeenCalledWith(ua, {});
     });
 
     it("sets finished when count reaches goal", async () => {
@@ -178,7 +178,7 @@ describe("MessageHandler", () => {
       await MessageHandler.handleMessageContent("u1", "ch1", "Hello everyone!");
 
       expect(ua.achieved.count).toBe(1);
-      expect(CacheDbService.update).toHaveBeenCalledWith(ua);
+      expect(CacheDbService.update).toHaveBeenCalledWith(ua, {});
     });
 
     it("does not update when message does not include typeAchievement data", async () => {

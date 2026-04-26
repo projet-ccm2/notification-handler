@@ -2,6 +2,8 @@ import { config } from "../config/environment";
 import { RedisService } from "./redis-service";
 import { DbService } from "./db-service";
 import { BadgeService } from "./badge-service";
+import { TwitchChatService } from "./twitch-chat-service";
+import { DiscordNotificationService } from "./discord-notification-service";
 import { logger } from "../utils/logger";
 import {
   AchievementWithType,
@@ -187,6 +189,7 @@ export class CacheDbService {
     userId: string,
     channelId: string,
     newList: Achieved[],
+    ctx: { channelLogin?: string; userLogin?: string },
   ): Promise<void> {
     let definitions = await RedisService.get<AchievementWithType[]>(
       this.buildAchievementsCacheKey(channelId),
@@ -198,10 +201,19 @@ export class CacheDbService {
     );
     if (allFinished) {
       await BadgeService.tryGrantBadge(userId, channelId);
+      if (ctx.channelLogin && ctx.userLogin) {
+        await TwitchChatService.sendBadgeGranted(
+          ctx.channelLogin,
+          ctx.userLogin,
+        );
+      }
     }
   }
 
-  static async update(userAchievement: UserAchievement): Promise<void> {
+  static async update(
+    userAchievement: UserAchievement,
+    ctx: { channelLogin?: string; userLogin?: string } = {},
+  ): Promise<void> {
     if (!userAchievement.achieved)
       throw new Error("UserAchievement.achieved is required for update");
     const userId = userAchievement.achieved.userId;
@@ -280,7 +292,24 @@ export class CacheDbService {
         });
 
         if (isNewCompletion) {
-          await this.tryGrantBadgeIfNewCompletion(userId, channelId, newList);
+          const userLogin = ctx.userLogin ?? "Un utilisateur";
+          await Promise.all([
+            this.tryGrantBadgeIfNewCompletion(userId, channelId, newList, ctx),
+            ...(ctx.channelLogin
+              ? [
+                  TwitchChatService.sendAchievementUnlocked(
+                    ctx.channelLogin,
+                    userLogin,
+                    userAchievement.title,
+                  ),
+                ]
+              : []),
+            DiscordNotificationService.sendAchievementUnlocked(
+              channelId,
+              userLogin,
+              userAchievement.title,
+            ),
+          ]);
         }
         return;
       } finally {

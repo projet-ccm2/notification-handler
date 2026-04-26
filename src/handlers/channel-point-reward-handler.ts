@@ -32,17 +32,20 @@ export class ChannelPointRewardHandler {
       });
       return;
     }
+    const ctx = { channelLogin: event.channelLogin, userLogin: event.userLogin };
     if ("id" in payload.reward) {
       await this.handleCountChannelPointRewardUse(
         userId,
         channelId,
         payload.reward.id,
+        ctx,
       );
     }
     await this.handleCountChannelPointRewardCost(
       userId,
       channelId,
       payload.reward.cost,
+      ctx,
     );
   }
 
@@ -50,6 +53,7 @@ export class ChannelPointRewardHandler {
     userId: string,
     channelId: string,
     idChannelPointReward: string,
+    ctx: { channelLogin?: string; userLogin?: string } = {},
   ): Promise<void> {
     const achievements = await CacheDbService.getAchievements(
       channelId,
@@ -60,7 +64,7 @@ export class ChannelPointRewardHandler {
       if (ua.label === idChannelPointReward) {
         ua.achieved.count += 1;
         ua.achieved.finished = ua.achieved.count >= ua.goal;
-        await CacheDbService.update(ua);
+        await CacheDbService.update(ua, ctx);
       }
     }
   }
@@ -69,6 +73,7 @@ export class ChannelPointRewardHandler {
     userId: string,
     channelId: string,
     costChannelPointReward: number,
+    ctx: { channelLogin?: string; userLogin?: string } = {},
   ): Promise<void> {
     const achievements = await CacheDbService.getAchievements(
       channelId,
@@ -78,7 +83,7 @@ export class ChannelPointRewardHandler {
     for (const ua of achievements) {
       ua.achieved.count += costChannelPointReward;
       ua.achieved.finished = ua.achieved.count >= ua.goal;
-      await CacheDbService.update(ua);
+      await CacheDbService.update(ua, ctx);
     }
   }
 }

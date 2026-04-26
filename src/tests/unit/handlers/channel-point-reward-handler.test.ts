@@ -154,7 +154,7 @@ describe("ChannelPointRewardHandler", () => {
       );
 
       expect(ua.achieved.count).toBe(1);
-      expect(CacheDbService.update).toHaveBeenCalledWith(ua);
+      expect(CacheDbService.update).toHaveBeenCalledWith(ua, {});
     });
 
     it("does not update when label does not match", async () => {
@@ -206,7 +206,7 @@ describe("ChannelPointRewardHandler", () => {
 
       expect(ua.achieved.count).toBe(250);
       expect(ua.achieved.finished).toBe(false);
-      expect(CacheDbService.update).toHaveBeenCalledWith(ua);
+      expect(CacheDbService.update).toHaveBeenCalledWith(ua, {});
     });
 
     it("sets finished when count reaches goal", async () => {
