@@ -293,6 +293,14 @@ export class CacheDbService {
 
         if (isNewCompletion) {
           const userLogin = ctx.userLogin ?? "Un utilisateur";
+          logger.info("Achievement newly completed, sending notifications", {
+            userId,
+            channelId,
+            achievementId: userAchievement.id,
+            achievementTitle: userAchievement.title,
+            userLogin,
+            channelLogin: ctx.channelLogin,
+          });
           await Promise.all([
             this.tryGrantBadgeIfNewCompletion(userId, channelId, newList, ctx),
             ...(ctx.channelLogin

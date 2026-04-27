@@ -47,7 +47,7 @@ function validateConfig(): Config {
     },
     twitchListener: {
       baseUrl: process.env.TWITCH_LISTENER_URL || "http://localhost:3000",
-      apiKey: process.env.TWITCH_LISTENER_API_KEY || "",
+      apiKey: process.env.CHAT_API_KEY || "",
     },
     discordNotification: {
       baseUrl: process.env.DISCORD_NOTIF_URL || "http://localhost:3001",
