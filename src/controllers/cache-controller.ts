@@ -19,6 +19,7 @@ export class CacheController {
       logger.error("Error clearing channel cache", {
         channelId: req.params.channelId,
         error: error instanceof Error ? error.message : String(error),
+        context: "cache-controller",
       });
       res.status(500).json({
         error: "Internal server error",

@@ -13,6 +13,7 @@ export class DiscordNotificationService {
       channelId,
       userLogin,
       achievementTitle,
+      context: "discord",
     });
     try {
       const response = await fetch(url, {
@@ -31,11 +32,13 @@ export class DiscordNotificationService {
           channelId,
           status: response.status,
           responseBody: body,
+          context: "discord",
         });
       } else {
         logger.debug("Discord notification sent successfully", {
           channelId,
           status: response.status,
+          context: "discord",
         });
       }
     } catch (error) {
@@ -43,6 +46,7 @@ export class DiscordNotificationService {
         url,
         channelId,
         error: error instanceof Error ? error.message : String(error),
+        context: "discord",
       });
     }
   }

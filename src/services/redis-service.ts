@@ -29,11 +29,11 @@ export class RedisService {
     const url = process.env.REDIS_URL ?? config.redis.url;
     this.client = createClient({ url });
     this.client.on("error", (err) =>
-      logger.error("Redis client error", { error: err.message }),
+      logger.error("Redis client error", { error: err.message, context: "redis" }),
     );
-    this.client.on("connect", () => logger.info("Redis client connecting"));
+    this.client.on("connect", () => logger.info("Redis client connecting", { context: "redis" }));
     this.client.on("ready", () => {
-      logger.info("Redis client ready");
+      logger.info("Redis client ready", { context: "redis" });
       this.isConnected = true;
     });
     await this.client.connect();

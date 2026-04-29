@@ -7,6 +7,7 @@ export class UnknownEventHandler {
       eventId: event.id,
       type: event.type,
       source: event.source,
+      context: "event-processing",
     });
   }
 }

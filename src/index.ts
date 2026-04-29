@@ -26,14 +26,16 @@ if (config.nodeEnv !== "test") {
     logger.info(`Server started on port ${config.port}`, {
       environment: config.nodeEnv,
       port: config.port,
+      context: "server",
     });
 
     try {
       await RedisService.connect();
-      logger.info("Redis connected successfully");
+      logger.info("Redis connected successfully", { context: "server" });
     } catch (error) {
       logger.error("Failed to connect to Redis", {
         error: error instanceof Error ? error.message : String(error),
+        context: "server",
       });
     }
   });
@@ -44,25 +46,27 @@ if (config.nodeEnv !== "test") {
     } catch (error) {
       logger.error("Failed to refresh expired cache entries", {
         error: error instanceof Error ? error.message : String(error),
+        context: "server",
       });
     }
   }, config.cache.syncIntervalMs);
 
   const gracefulShutdown = async (signal: string) => {
-    logger.info(`${signal} received, shutting down gracefully`);
+    logger.info(`${signal} received, shutting down gracefully`, { context: "server" });
     clearInterval(syncInterval);
     try {
-      logger.debug("Flushing pending sync data before shutdown");
+      logger.debug("Flushing pending sync data before shutdown", { context: "server" });
       await CacheDbService.refreshExpiredCacheEntries(true);
-      logger.debug("Flush complete, disconnecting Redis");
+      logger.debug("Flush complete, disconnecting Redis", { context: "server" });
       await RedisService.disconnect();
       server.close(() => {
-        logger.info("Server closed");
+        logger.info("Server closed", { context: "server" });
         process.exit(0);
       });
     } catch (error) {
       logger.error("Error during shutdown", {
         error: error instanceof Error ? error.message : String(error),
+        context: "server",
       });
       process.exit(1);
     }

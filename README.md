@@ -261,3 +261,65 @@ Clears all cache for a channel: channel achievement definitions and all users’
 ## Generic errors
 
 - **404 Not Found** – Route or resource does not exist (default Express response for undefined routes).
+
+---
+
+## Logs & Filtering
+
+### Logger
+
+[Winston](https://github.com/winstonjs/winston) is used for structured JSON logging. The log level is `debug` when `NODE_ENV=development`, and `info` for all other environments.
+
+All log entries carry:
+- `service: "Notification-handler"` — always present (defaultMeta)
+- `timestamp` — ISO 8601
+- `context` — identifies the subsystem that emitted the log (see table below)
+
+### Context taxonomy
+
+| `context` value          | Subsystem                                                              |
+|--------------------------|------------------------------------------------------------------------|
+| `server`                 | Express startup, Redis connection, shutdown lifecycle                  |
+| `event-processing`       | Top-level event dispatch and unknown event handling                    |
+| `message-handler`        | Twitch chat message processing, count/content achievement checks       |
+| `channel-points-handler` | Channel point reward redemption processing                             |
+| `achievement`            | Achievement completion detection, notification dispatch                |
+| `cache-sync`             | Periodic cache-to-DB flush (`refreshExpiredCacheEntries`)              |
+| `db-gateway`             | All HTTP calls to the DB gateway service                               |
+| `redis`                  | Redis client lifecycle (connect, ready, errors)                        |
+| `discord`                | Discord webhook notifications                                          |
+| `twitch`                 | Twitch chat message delivery                                           |
+| `badge`                  | Badge grant logic                                                      |
+| `cache-controller`       | Cache clear HTTP endpoint                                              |
+| `event-controller`       | Event ingestion HTTP endpoint                                          |
+
+### Sync architecture
+
+When an achievement is updated, the new state is written to Redis with a TTL (default `CACHE_TTL` seconds) and the cache key is added to the `sync:pending` set. A `setInterval` running every `CACHE_SYNC_INTERVAL_MS` calls `refreshExpiredCacheEntries`. When a key's TTL has expired (or at shutdown with `force=true`), the pending sync data is flushed to the DB gateway and the key is removed from Redis. If a single key fails to flush, the error is logged with `context: "cache-sync"` and processing continues with the next pending key.
+
+### Filtering examples
+
+**GCP Cloud Logging** — filter in the query panel:
+
+```
+resource.type="cloud_run_revision"
+jsonPayload.context="cache-sync"
+```
+
+```
+resource.type="cloud_run_revision"
+jsonPayload.context="discord" severity>=ERROR
+```
+
+**Locally with `jq`** (JSON logs piped from stdout):
+
+```bash
+# All errors from the cache-sync subsystem
+node dist/index.js 2>&1 | jq 'select(.level == "error" and .context == "cache-sync")'
+
+# All Discord logs
+node dist/index.js 2>&1 | jq 'select(.context == "discord")'
+
+# Achievement completions only
+node dist/index.js 2>&1 | jq 'select(.context == "achievement")'
+```

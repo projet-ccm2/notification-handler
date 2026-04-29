@@ -13,6 +13,7 @@ export class MessageHandler {
       channel: event.channelLogin,
       user: event.userLogin,
       message: payload.message,
+      context: "message-handler",
     });
 
     const userId = event.userId;
@@ -24,6 +25,7 @@ export class MessageHandler {
         channel: event.channelLogin,
         user: event.userLogin,
         message: messageContent,
+        context: "message-handler",
       });
       return;
     }
@@ -52,6 +54,7 @@ export class MessageHandler {
         currentCount: a.achieved?.count,
         finished: a.achieved?.finished,
       })),
+      context: "message-handler",
     });
     for (const ua of achievements) {
       ua.achieved.count += 1;
@@ -82,6 +85,7 @@ export class MessageHandler {
         currentCount: a.achieved?.count,
         finished: a.achieved?.finished,
       })),
+      context: "message-handler",
     });
     const lowercaseMessage = message.toLowerCase();
     let typeDataLowercase: string;

@@ -300,6 +300,7 @@ export class CacheDbService {
             achievementTitle: userAchievement.title,
             userLogin,
             channelLogin: ctx.channelLogin,
+            context: "achievement",
           });
           await Promise.all([
             this.tryGrantBadgeIfNewCompletion(userId, channelId, newList, ctx),
@@ -347,6 +348,7 @@ export class CacheDbService {
         logger.debug("Cache TTL expired, starting flush to DB", {
           cacheKey,
           ttl,
+          context: "cache-sync",
         });
 
         const syncDataList =
@@ -355,6 +357,7 @@ export class CacheDbService {
         if (syncDataList.length === 0) {
           logger.debug("No sync data to flush, removing from sync set", {
             cacheKey,
+            context: "cache-sync",
           });
           await RedisService.removeFromSyncSet(cacheKey);
           continue;
@@ -366,12 +369,14 @@ export class CacheDbService {
             logger.debug("Flushing exp to DB gateway", {
               userId: syncData.userId,
               rewardToAdd: data.rewardToAdd,
+              context: "cache-sync",
             });
             await DbService.addExpToUser(syncData.userId, data.rewardToAdd);
           }
           logger.debug("Flushing achieved to DB gateway", {
             userId: syncData.userId,
             achievementId: syncData.achievementId,
+            context: "cache-sync",
           });
           await DbService.saveAchieved({
             achievementId: syncData.achievementId,
@@ -386,6 +391,7 @@ export class CacheDbService {
         logger.debug("Flush complete, cleaning up sync data", {
           cacheKey,
           syncedCount: syncDataList.length,
+          context: "cache-sync",
         });
         const syncKeys = await RedisService.getSyncDataKeys(cacheKey);
         await RedisService.execPipeline((p) => {
@@ -397,6 +403,12 @@ export class CacheDbService {
             RedisService.buildKey(cacheKey),
           );
           p.del(RedisService.buildKey(cacheKey));
+        });
+      } catch (error) {
+        logger.error("Failed to flush cache key to DB", {
+          cacheKey,
+          error: error instanceof Error ? error.message : String(error),
+          context: "cache-sync",
         });
       } finally {
         await RedisService.releaseLock(lockKey, lockToken);

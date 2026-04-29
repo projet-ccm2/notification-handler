@@ -46,6 +46,7 @@ describe("ChannelPointRewardHandler", () => {
         channel: "chan",
         userId: "u1",
         userLogin: "user",
+        context: "channel-points-handler",
       },
     );
   });

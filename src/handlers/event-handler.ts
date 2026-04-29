@@ -24,6 +24,7 @@ export class EventHandler {
         eventId: event.id,
         eventType: event.type,
         error: error instanceof Error ? error.message : String(error),
+        context: "event-processing",
       });
       throw error;
     }

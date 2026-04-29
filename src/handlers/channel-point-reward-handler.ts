@@ -20,6 +20,7 @@ export class ChannelPointRewardHandler {
       channel: event.channelLogin,
       userId: event.userId,
       userLogin: event.userLogin,
+      context: "channel-points-handler",
     });
 
     const userId = event.userId;
@@ -29,6 +30,7 @@ export class ChannelPointRewardHandler {
         eventId: event.id,
         channel: event.channelLogin,
         user: event.userLogin,
+        context: "channel-points-handler",
       });
       return;
     }

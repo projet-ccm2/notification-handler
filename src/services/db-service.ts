@@ -31,7 +31,7 @@ const fetchJsonOrNull = async <T>(url: string): Promise<T | null> => {
 };
 
 const putJson = async (url: string, body: object): Promise<void> => {
-  logger.debug("DB Gateway PUT request", { url, body });
+  logger.debug("DB Gateway PUT request", { url, body, context: "db-gateway" });
   const response = await fetch(url, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -42,6 +42,7 @@ const putJson = async (url: string, body: object): Promise<void> => {
     url,
     status: response.status,
     body: responseText,
+    context: "db-gateway",
   });
   if (!response.ok)
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);

@@ -75,6 +75,7 @@ export class EventController {
     } catch (error) {
       logger.error("Error processing events", {
         error: error instanceof Error ? error.message : String(error),
+        context: "event-controller",
       });
 
       res.status(500).json({

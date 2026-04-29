@@ -32,6 +32,7 @@ describe("UnknownEventHandler", () => {
       eventId: "e1",
       type: "unknown.type",
       source: "twitch",
+      context: "event-processing",
     });
   });
 });

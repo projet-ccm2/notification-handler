@@ -148,6 +148,7 @@ describe("RedisService", () => {
     errorCallback?.({ message: "Connection refused" });
     expect(logger.error).toHaveBeenCalledWith("Redis client error", {
       error: "Connection refused",
+      context: "redis",
     });
   });
 });

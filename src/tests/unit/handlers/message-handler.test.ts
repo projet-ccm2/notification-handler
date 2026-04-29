@@ -43,6 +43,7 @@ describe("MessageHandler", () => {
       channel: "chan",
       user: "user",
       message: "hello world",
+      context: "message-handler",
     });
   });
 

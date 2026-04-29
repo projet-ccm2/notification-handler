@@ -30,6 +30,7 @@ export class TwitchChatService {
       channelLogin,
       message,
       apiKeyConfigured,
+      context: "twitch",
     });
     try {
       const response = await fetch(url, {
@@ -47,11 +48,13 @@ export class TwitchChatService {
           channelLogin,
           status: response.status,
           responseBody: body,
+          context: "twitch",
         });
       } else {
         logger.debug("Twitch chat message sent successfully", {
           channelLogin,
           status: response.status,
+          context: "twitch",
         });
       }
     } catch (error) {
@@ -59,6 +62,7 @@ export class TwitchChatService {
         url,
         channelLogin,
         error: error instanceof Error ? error.message : String(error),
+        context: "twitch",
       });
     }
   }

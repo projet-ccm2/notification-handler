@@ -76,6 +76,7 @@ describe("BadgeService", () => {
       userId: "u1",
       channelId: "ch1",
       badgeId: "b1",
+      context: "badge",
     });
   });
 
@@ -112,6 +113,7 @@ describe("BadgeService", () => {
       userId: "u1",
       channelId: "ch1",
       error: "HTTP 500: Server Error",
+      context: "badge",
     });
   });
 
@@ -124,6 +126,7 @@ describe("BadgeService", () => {
       userId: "u1",
       channelId: "ch1",
       error: "string error",
+      context: "badge",
     });
   });
 });
