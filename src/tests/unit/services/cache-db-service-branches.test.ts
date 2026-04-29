@@ -38,6 +38,7 @@ const { BadgeService } = require("../../../services/badge-service");
 describe("CacheDbService branches", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    Redis.isAvailable.mockReturnValue(true);
     Redis.buildKey.mockImplementation((k: string) => `test:${k}`);
     Redis.execPipeline.mockResolvedValue(undefined);
     Redis.getSyncDataKeys.mockResolvedValue([]);
