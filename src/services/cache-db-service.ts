@@ -82,11 +82,53 @@ export class CacheDbService {
     );
   }
 
+  private static async fetchFromDb(
+    channelId: string,
+    userId: string,
+    typeAchievement: string,
+  ): Promise<UserAchievement[]> {
+    const apiResponse = await DbService.getUserAchievements(userId, channelId);
+    const itemsWithType =
+      apiResponse.length === 0
+        ? []
+        : apiResponse.filter((item) => item.typeAchievement != null);
+    const definitions =
+      itemsWithType.length === 0
+        ? await DbService.getAchievements(channelId)
+        : itemsWithType.map((item) => ({
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            goal: item.goal,
+            reward: item.reward,
+            label: item.label,
+            typeAchievement: item.typeAchievement,
+          }));
+    const achievedList =
+      itemsWithType.length === 0
+        ? []
+        : itemsWithType.map(
+            (item) =>
+              item.achieved ?? UserAchievement.defaultAchieved(item.id, userId),
+          );
+    return this.mergeAndFilter(
+      definitions,
+      achievedList,
+      channelId,
+      typeAchievement,
+      userId,
+    );
+  }
+
   static async getAchievements(
     channelId: string,
     userId: string,
     typeAchievement: string,
   ): Promise<UserAchievement[]> {
+    if (!RedisService.isAvailable()) {
+      return this.fetchFromDb(channelId, userId, typeAchievement);
+    }
+
     const cacheKeyAchievements = this.buildAchievementsCacheKey(channelId);
     const cacheKeyUser = this.buildUserAchievedCacheKey(userId, channelId);
 
@@ -210,10 +252,86 @@ export class CacheDbService {
     }
   }
 
+  private static async updateDirectToDb(
+    userAchievement: UserAchievement,
+    ctx: { channelLogin?: string; userLogin?: string },
+  ): Promise<void> {
+    if (!userAchievement.achieved)
+      throw new Error("UserAchievement.achieved is required for update");
+    const userId = userAchievement.achieved.userId;
+    if (!userId)
+      throw new Error("UserAchievement.achieved.userId is required for update");
+    const channelId = userAchievement.channelId;
+
+    const updated = userAchievement.toCacheAchieved();
+    if (updated.finished && !updated.acquiredDate) {
+      updated.acquiredDate = new Date().toISOString();
+    }
+
+    const allAchieved = await DbService.getUserAchievements(userId, channelId);
+    const existingItem = allAchieved.find((item) => item.id === userAchievement.id);
+    const wasFinished = existingItem?.achieved?.finished === true;
+    const isNewCompletion = !wasFinished && updated.finished;
+
+    await DbService.saveAchieved({
+      achievementId: userAchievement.id,
+      userId,
+      count: updated.count,
+      finished: updated.finished,
+      labelActive: updated.labelActive,
+      acquiredDate: updated.acquiredDate,
+    });
+
+    if (isNewCompletion) {
+      if (userAchievement.reward != null) {
+        await DbService.addExpToUser(userId, userAchievement.reward);
+      }
+
+      const newList: Achieved[] = allAchieved
+        .filter((item) => item.achieved != null)
+        .map((item) => item.achieved!);
+      const idx = newList.findIndex((a) => a.achievementId === userAchievement.id);
+      if (idx >= 0) newList[idx] = updated;
+      else newList.push(updated);
+
+      const userLogin = ctx.userLogin ?? "Un utilisateur";
+      logger.info("Achievement newly completed (no-cache mode), sending notifications", {
+        userId,
+        channelId,
+        achievementId: userAchievement.id,
+        achievementTitle: userAchievement.title,
+        userLogin,
+        channelLogin: ctx.channelLogin,
+        context: "achievement",
+      });
+      await Promise.all([
+        this.tryGrantBadgeIfNewCompletion(userId, channelId, newList, ctx),
+        ...(ctx.channelLogin
+          ? [
+              TwitchChatService.sendAchievementUnlocked(
+                ctx.channelLogin,
+                userLogin,
+                userAchievement.title,
+              ),
+            ]
+          : []),
+        DiscordNotificationService.sendAchievementUnlocked(
+          channelId,
+          userLogin,
+          userAchievement.title,
+        ),
+      ]);
+    }
+  }
+
   static async update(
     userAchievement: UserAchievement,
     ctx: { channelLogin?: string; userLogin?: string } = {},
   ): Promise<void> {
+    if (!RedisService.isAvailable()) {
+      return this.updateDirectToDb(userAchievement, ctx);
+    }
+
     if (!userAchievement.achieved)
       throw new Error("UserAchievement.achieved is required for update");
     const userId = userAchievement.achieved.userId;
