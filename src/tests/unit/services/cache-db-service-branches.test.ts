@@ -720,7 +720,11 @@ describe("CacheDbService branches", () => {
       await CacheDbService.update(u);
 
       const pipelineCallback = Redis.execPipeline.mock.calls[0][0];
-      const mockPipeline = { setEx: jest.fn(), sAdd: jest.fn(), set: jest.fn() };
+      const mockPipeline = {
+        setEx: jest.fn(),
+        sAdd: jest.fn(),
+        set: jest.fn(),
+      };
       pipelineCallback(mockPipeline as any);
       const syncData = JSON.parse(mockPipeline.set.mock.calls[0][1]);
       expect(syncData.data.rewardToAdd).toBe(75);
@@ -765,7 +769,11 @@ describe("CacheDbService branches", () => {
       await CacheDbService.update(u);
 
       const pipelineCallback = Redis.execPipeline.mock.calls[0][0];
-      const mockPipeline = { setEx: jest.fn(), sAdd: jest.fn(), set: jest.fn() };
+      const mockPipeline = {
+        setEx: jest.fn(),
+        sAdd: jest.fn(),
+        set: jest.fn(),
+      };
       pipelineCallback(mockPipeline as any);
       const syncData = JSON.parse(mockPipeline.set.mock.calls[0][1]);
       expect(syncData.data.rewardToAdd).toBe(50);

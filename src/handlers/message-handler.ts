@@ -29,7 +29,10 @@ export class MessageHandler {
       });
       return;
     }
-    const ctx = { channelLogin: event.channelLogin, userLogin: event.userLogin };
+    const ctx = {
+      channelLogin: event.channelLogin,
+      userLogin: event.userLogin,
+    };
     await this.handleCountMessages(userId, channelId, ctx);
     await this.handleMessageContent(userId, channelId, payload.message, ctx);
   }

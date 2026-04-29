@@ -23,7 +23,7 @@ export class TwitchChatService {
     channelLogin: string,
     message: string,
   ): Promise<void> {
-    const url = `${config.twitchListener.baseUrl}/message`;
+    const url = `${config.twitchListener.baseUrl}/chat/message`;
     const apiKeyConfigured = !!config.twitchListener.apiKey;
     logger.debug("Sending Twitch chat message", {
       url,
@@ -41,19 +41,19 @@ export class TwitchChatService {
         },
         body: JSON.stringify({ channelLogin, message }),
       });
-      if (!response.ok) {
+      if (response.ok) {
+        logger.debug("Twitch chat message sent successfully", {
+          channelLogin,
+          status: response.status,
+          context: "twitch",
+        });
+      } else {
         const body = await response.text().catch(() => "");
         logger.error("Failed to send Twitch chat message", {
           url,
           channelLogin,
           status: response.status,
           responseBody: body,
-          context: "twitch",
-        });
-      } else {
-        logger.debug("Twitch chat message sent successfully", {
-          channelLogin,
-          status: response.status,
           context: "twitch",
         });
       }

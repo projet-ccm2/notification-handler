@@ -11,7 +11,12 @@ export class BadgeService {
       if (possesses) return;
 
       await DbService.postPossesses(userId, badge.id, new Date().toISOString());
-      logger.info("Badge granted", { userId, channelId, badgeId: badge.id, context: "badge" });
+      logger.info("Badge granted", {
+        userId,
+        channelId,
+        badgeId: badge.id,
+        context: "badge",
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("409")) return;

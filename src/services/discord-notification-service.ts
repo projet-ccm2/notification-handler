@@ -25,19 +25,19 @@ export class DiscordNotificationService {
           text: `${userLogin} a débloqué : ${achievementTitle}`,
         }),
       });
-      if (!response.ok) {
+      if (response.ok) {
+        logger.debug("Discord notification sent successfully", {
+          channelId,
+          status: response.status,
+          context: "discord",
+        });
+      } else {
         const body = await response.text().catch(() => "");
         logger.error("Failed to send Discord notification", {
           url,
           channelId,
           status: response.status,
           responseBody: body,
-          context: "discord",
-        });
-      } else {
-        logger.debug("Discord notification sent successfully", {
-          channelId,
-          status: response.status,
           context: "discord",
         });
       }

@@ -52,12 +52,18 @@ if (config.nodeEnv !== "test") {
   }, config.cache.syncIntervalMs);
 
   const gracefulShutdown = async (signal: string) => {
-    logger.info(`${signal} received, shutting down gracefully`, { context: "server" });
+    logger.info(`${signal} received, shutting down gracefully`, {
+      context: "server",
+    });
     clearInterval(syncInterval);
     try {
-      logger.debug("Flushing pending sync data before shutdown", { context: "server" });
+      logger.debug("Flushing pending sync data before shutdown", {
+        context: "server",
+      });
       await CacheDbService.refreshExpiredCacheEntries(true);
-      logger.debug("Flush complete, disconnecting Redis", { context: "server" });
+      logger.debug("Flush complete, disconnecting Redis", {
+        context: "server",
+      });
       await RedisService.disconnect();
       server.close(() => {
         logger.info("Server closed", { context: "server" });

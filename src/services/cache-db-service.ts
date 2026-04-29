@@ -120,6 +120,59 @@ export class CacheDbService {
     );
   }
 
+  private static async fetchAndPopulateCache(
+    cacheKeyAchievements: string,
+    cacheKeyUser: string,
+    channelId: string,
+    typeAchievement: string,
+    userId: string,
+  ): Promise<UserAchievement[]> {
+    const cached = await this.tryGetFromCache(
+      cacheKeyAchievements,
+      cacheKeyUser,
+      channelId,
+      typeAchievement,
+      userId,
+    );
+    if (cached) return cached;
+
+    const apiResponse = await DbService.getUserAchievements(userId, channelId);
+    const itemsWithType =
+      apiResponse.length === 0
+        ? []
+        : apiResponse.filter((item) => item.typeAchievement != null);
+    const definitions =
+      itemsWithType.length === 0
+        ? await DbService.getAchievements(channelId)
+        : itemsWithType.map((item) => ({
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            goal: item.goal,
+            reward: item.reward,
+            label: item.label,
+            typeAchievement: item.typeAchievement,
+          }));
+    const achievedList =
+      itemsWithType.length === 0
+        ? []
+        : itemsWithType.map(
+            (item) =>
+              item.achieved ?? UserAchievement.defaultAchieved(item.id, userId),
+          );
+
+    await RedisService.set(cacheKeyAchievements, definitions, this.CACHE_TTL);
+    await RedisService.set(cacheKeyUser, achievedList, this.CACHE_TTL);
+
+    return this.mergeAndFilter(
+      definitions,
+      achievedList,
+      channelId,
+      typeAchievement,
+      userId,
+    );
+  }
+
   static async getAchievements(
     channelId: string,
     userId: string,
@@ -163,67 +216,27 @@ export class CacheDbService {
     }
 
     if (!lockToken) {
-      const final = await this.tryGetFromCache(
-        cacheKeyAchievements,
-        cacheKeyUser,
-        channelId,
-        typeAchievement,
-        userId,
+      return (
+        (await this.tryGetFromCache(
+          cacheKeyAchievements,
+          cacheKeyUser,
+          channelId,
+          typeAchievement,
+          userId,
+        )) ?? []
       );
-      return final ?? [];
     }
 
     try {
-      const again = await this.tryGetFromCache(
+      return await this.fetchAndPopulateCache(
         cacheKeyAchievements,
         cacheKeyUser,
-        channelId,
-        typeAchievement,
-        userId,
-      );
-      if (again) return again;
-
-      const apiResponse = await DbService.getUserAchievements(
-        userId,
-        channelId,
-      );
-      const itemsWithType =
-        apiResponse.length === 0
-          ? []
-          : apiResponse.filter((item) => item.typeAchievement != null);
-      const definitions =
-        itemsWithType.length === 0
-          ? await DbService.getAchievements(channelId)
-          : itemsWithType.map((item) => ({
-              id: item.id,
-              title: item.title,
-              description: item.description,
-              goal: item.goal,
-              reward: item.reward,
-              label: item.label,
-              typeAchievement: item.typeAchievement,
-            }));
-      const achievedList =
-        itemsWithType.length === 0
-          ? []
-          : itemsWithType.map(
-              (item) =>
-                item.achieved ??
-                UserAchievement.defaultAchieved(item.id, userId),
-            );
-
-      await RedisService.set(cacheKeyAchievements, definitions, this.CACHE_TTL);
-      await RedisService.set(cacheKeyUser, achievedList, this.CACHE_TTL);
-
-      return this.mergeAndFilter(
-        definitions,
-        achievedList,
         channelId,
         typeAchievement,
         userId,
       );
     } finally {
-      if (lockToken) await RedisService.releaseLock(lockKey, lockToken);
+      await RedisService.releaseLock(lockKey, lockToken);
     }
   }
 
@@ -269,7 +282,9 @@ export class CacheDbService {
     }
 
     const allAchieved = await DbService.getUserAchievements(userId, channelId);
-    const existingItem = allAchieved.find((item) => item.id === userAchievement.id);
+    const existingItem = allAchieved.find(
+      (item) => item.id === userAchievement.id,
+    );
     const wasFinished = existingItem?.achieved?.finished === true;
     const isNewCompletion = !wasFinished && updated.finished;
 
@@ -290,12 +305,114 @@ export class CacheDbService {
       const newList: Achieved[] = allAchieved
         .filter((item) => item.achieved != null)
         .map((item) => item.achieved!);
-      const idx = newList.findIndex((a) => a.achievementId === userAchievement.id);
+      const idx = newList.findIndex(
+        (a) => a.achievementId === userAchievement.id,
+      );
       if (idx >= 0) newList[idx] = updated;
       else newList.push(updated);
 
       const userLogin = ctx.userLogin ?? "Un utilisateur";
-      logger.info("Achievement newly completed (no-cache mode), sending notifications", {
+      logger.info(
+        "Achievement newly completed (no-cache mode), sending notifications",
+        {
+          userId,
+          channelId,
+          achievementId: userAchievement.id,
+          achievementTitle: userAchievement.title,
+          userLogin,
+          channelLogin: ctx.channelLogin,
+          context: "achievement",
+        },
+      );
+      await Promise.all([
+        this.tryGrantBadgeIfNewCompletion(userId, channelId, newList, ctx),
+        ...(ctx.channelLogin
+          ? [
+              TwitchChatService.sendAchievementUnlocked(
+                ctx.channelLogin,
+                userLogin,
+                userAchievement.title,
+              ),
+            ]
+          : []),
+        DiscordNotificationService.sendAchievementUnlocked(
+          channelId,
+          userLogin,
+          userAchievement.title,
+        ),
+      ]);
+    }
+  }
+
+  private static async performCachedUpdate(
+    cacheKey: string,
+    userAchievement: UserAchievement,
+    userId: string,
+    channelId: string,
+    ctx: { channelLogin?: string; userLogin?: string },
+  ): Promise<void> {
+    let achievedList = await RedisService.get<Achieved[]>(cacheKey);
+    if (achievedList === null) {
+      await this.getAchievements(
+        channelId,
+        userId,
+        userAchievement.typeAchievement.label,
+      );
+      achievedList = (await RedisService.get<Achieved[]>(cacheKey)) ?? [];
+    }
+
+    const updated = userAchievement.toCacheAchieved();
+    const idx = achievedList.findIndex(
+      (a) => a.achievementId === userAchievement.id,
+    );
+    const previousAchieved = idx >= 0 ? achievedList[idx] : undefined;
+    const isNewCompletion =
+      previousAchieved?.finished !== true && updated.finished === true;
+    if (updated.finished && !updated.acquiredDate) {
+      updated.acquiredDate = new Date().toISOString();
+    }
+    const newList =
+      idx >= 0
+        ? achievedList.map((a, i) => (i === idx ? updated : a))
+        : [...achievedList, updated];
+
+    const existingSyncData = await RedisService.getSyncData(
+      cacheKey,
+      userAchievement.id,
+    );
+    const preservedReward = (existingSyncData?.data as SyncDataForAchievement)
+      ?.rewardToAdd;
+    const rewardToAdd = isNewCompletion
+      ? userAchievement.reward
+      : preservedReward;
+    const syncData = JSON.stringify({
+      userId,
+      achievementId: userAchievement.id,
+      data: {
+        count: updated.count,
+        finished: updated.finished,
+        labelActive: updated.labelActive,
+        acquiredDate: updated.acquiredDate,
+        ...(rewardToAdd != null && { rewardToAdd }),
+      },
+    });
+    const syncKey = `sync:data:${cacheKey}:${userAchievement.id}`;
+    await RedisService.execPipeline((p) => {
+      p.setEx(
+        RedisService.buildKey(cacheKey),
+        this.CACHE_TTL,
+        JSON.stringify(newList),
+      );
+      p.sAdd(
+        RedisService.buildKey("sync:pending"),
+        RedisService.buildKey(cacheKey),
+      );
+      p.set(RedisService.buildKey(syncKey), syncData);
+    });
+
+    if (isNewCompletion) {
+      const userLogin = ctx.userLogin ?? "Un utilisateur";
+      logger.info("Achievement newly completed, sending notifications", {
         userId,
         channelId,
         achievementId: userAchievement.id,
@@ -349,95 +466,13 @@ export class CacheDbService {
       }
 
       try {
-        let achievedList = await RedisService.get<Achieved[]>(cacheKey);
-        if (achievedList === null) {
-          await this.getAchievements(
-            channelId,
-            userId,
-            userAchievement.typeAchievement.label,
-          );
-          achievedList = (await RedisService.get<Achieved[]>(cacheKey)) ?? [];
-        }
-
-        const updated = userAchievement.toCacheAchieved();
-        const idx = achievedList.findIndex(
-          (a) => a.achievementId === userAchievement.id,
-        );
-        const previousAchieved = idx >= 0 ? achievedList[idx] : undefined;
-        const isNewCompletion =
-          previousAchieved?.finished !== true && updated.finished === true;
-        if (updated.finished && !updated.acquiredDate) {
-          updated.acquiredDate = new Date().toISOString();
-        }
-        const newList =
-          idx >= 0
-            ? achievedList.map((a, i) => (i === idx ? updated : a))
-            : [...achievedList, updated];
-
-        const existingSyncData = await RedisService.getSyncData(
+        await this.performCachedUpdate(
           cacheKey,
-          userAchievement.id,
-        );
-        const preservedReward = (
-          existingSyncData?.data as SyncDataForAchievement
-        )?.rewardToAdd;
-        const rewardToAdd = isNewCompletion
-          ? userAchievement.reward
-          : preservedReward;
-        const syncData = JSON.stringify({
+          userAchievement,
           userId,
-          achievementId: userAchievement.id,
-          data: {
-            count: updated.count,
-            finished: updated.finished,
-            labelActive: updated.labelActive,
-            acquiredDate: updated.acquiredDate,
-            ...(rewardToAdd != null && { rewardToAdd }),
-          },
-        });
-        const syncKey = `sync:data:${cacheKey}:${userAchievement.id}`;
-        await RedisService.execPipeline((p) => {
-          p.setEx(
-            RedisService.buildKey(cacheKey),
-            this.CACHE_TTL,
-            JSON.stringify(newList),
-          );
-          p.sAdd(
-            RedisService.buildKey("sync:pending"),
-            RedisService.buildKey(cacheKey),
-          );
-          p.set(RedisService.buildKey(syncKey), syncData);
-        });
-
-        if (isNewCompletion) {
-          const userLogin = ctx.userLogin ?? "Un utilisateur";
-          logger.info("Achievement newly completed, sending notifications", {
-            userId,
-            channelId,
-            achievementId: userAchievement.id,
-            achievementTitle: userAchievement.title,
-            userLogin,
-            channelLogin: ctx.channelLogin,
-            context: "achievement",
-          });
-          await Promise.all([
-            this.tryGrantBadgeIfNewCompletion(userId, channelId, newList, ctx),
-            ...(ctx.channelLogin
-              ? [
-                  TwitchChatService.sendAchievementUnlocked(
-                    ctx.channelLogin,
-                    userLogin,
-                    userAchievement.title,
-                  ),
-                ]
-              : []),
-            DiscordNotificationService.sendAchievementUnlocked(
-              channelId,
-              userLogin,
-              userAchievement.title,
-            ),
-          ]);
-        }
+          channelId,
+          ctx,
+        );
         return;
       } finally {
         await RedisService.releaseLock(lockKey, lockToken);

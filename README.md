@@ -271,27 +271,28 @@ Clears all cache for a channel: channel achievement definitions and all users’
 [Winston](https://github.com/winstonjs/winston) is used for structured JSON logging. The log level is `debug` when `NODE_ENV=development`, and `info` for all other environments.
 
 All log entries carry:
+
 - `service: "Notification-handler"` — always present (defaultMeta)
 - `timestamp` — ISO 8601
 - `context` — identifies the subsystem that emitted the log (see table below)
 
 ### Context taxonomy
 
-| `context` value          | Subsystem                                                              |
-|--------------------------|------------------------------------------------------------------------|
-| `server`                 | Express startup, Redis connection, shutdown lifecycle                  |
-| `event-processing`       | Top-level event dispatch and unknown event handling                    |
-| `message-handler`        | Twitch chat message processing, count/content achievement checks       |
-| `channel-points-handler` | Channel point reward redemption processing                             |
-| `achievement`            | Achievement completion detection, notification dispatch                |
-| `cache-sync`             | Periodic cache-to-DB flush (`refreshExpiredCacheEntries`)              |
-| `db-gateway`             | All HTTP calls to the DB gateway service                               |
-| `redis`                  | Redis client lifecycle (connect, ready, errors)                        |
-| `discord`                | Discord webhook notifications                                          |
-| `twitch`                 | Twitch chat message delivery                                           |
-| `badge`                  | Badge grant logic                                                      |
-| `cache-controller`       | Cache clear HTTP endpoint                                              |
-| `event-controller`       | Event ingestion HTTP endpoint                                          |
+| `context` value          | Subsystem                                                        |
+| ------------------------ | ---------------------------------------------------------------- |
+| `server`                 | Express startup, Redis connection, shutdown lifecycle            |
+| `event-processing`       | Top-level event dispatch and unknown event handling              |
+| `message-handler`        | Twitch chat message processing, count/content achievement checks |
+| `channel-points-handler` | Channel point reward redemption processing                       |
+| `achievement`            | Achievement completion detection, notification dispatch          |
+| `cache-sync`             | Periodic cache-to-DB flush (`refreshExpiredCacheEntries`)        |
+| `db-gateway`             | All HTTP calls to the DB gateway service                         |
+| `redis`                  | Redis client lifecycle (connect, ready, errors)                  |
+| `discord`                | Discord webhook notifications                                    |
+| `twitch`                 | Twitch chat message delivery                                     |
+| `badge`                  | Badge grant logic                                                |
+| `cache-controller`       | Cache clear HTTP endpoint                                        |
+| `event-controller`       | Event ingestion HTTP endpoint                                    |
 
 ### Sync architecture
 

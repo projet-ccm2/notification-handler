@@ -34,7 +34,10 @@ export class ChannelPointRewardHandler {
       });
       return;
     }
-    const ctx = { channelLogin: event.channelLogin, userLogin: event.userLogin };
+    const ctx = {
+      channelLogin: event.channelLogin,
+      userLogin: event.userLogin,
+    };
     if ("id" in payload.reward) {
       await this.handleCountChannelPointRewardUse(
         userId,

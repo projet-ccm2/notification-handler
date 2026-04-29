@@ -16,16 +16,22 @@ export class RedisService {
   }
 
   private static isLimitExceededError(error: unknown): boolean {
-    return error instanceof Error && error.message.includes("max requests limit exceeded");
+    return (
+      error instanceof Error &&
+      error.message.includes("max requests limit exceeded")
+    );
   }
 
   private static handleLimitError(error: unknown): void {
     if (this.isLimitExceededError(error)) {
       if (!this.disabled) {
         this.disabled = true;
-        logger.warn("Redis request limit exceeded, switching to no-cache mode", {
-          context: "redis",
-        });
+        logger.warn(
+          "Redis request limit exceeded, switching to no-cache mode",
+          {
+            context: "redis",
+          },
+        );
       }
       return;
     }
@@ -51,9 +57,14 @@ export class RedisService {
     const url = process.env.REDIS_URL ?? config.redis.url;
     this.client = createClient({ url });
     this.client.on("error", (err) =>
-      logger.error("Redis client error", { error: err.message, context: "redis" }),
+      logger.error("Redis client error", {
+        error: err.message,
+        context: "redis",
+      }),
     );
-    this.client.on("connect", () => logger.info("Redis client connecting", { context: "redis" }));
+    this.client.on("connect", () =>
+      logger.info("Redis client connecting", { context: "redis" }),
+    );
     this.client.on("ready", () => {
       logger.info("Redis client ready", { context: "redis" });
       this.isConnected = true;
@@ -96,7 +107,9 @@ export class RedisService {
     if (this.disabled) return keys.map(() => null);
     if (keys.length === 0) return [];
     try {
-      return await this.execute((c) => c.mGet(keys.map((k) => this.prefixKey(k))));
+      return await this.execute((c) =>
+        c.mGet(keys.map((k) => this.prefixKey(k))),
+      );
     } catch (error) {
       this.handleLimitError(error);
       return keys.map(() => null);
