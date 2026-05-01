@@ -11,9 +11,15 @@ const COUNT_CHANNEL_POINT_REWARD_COST_TYPE = "countChannelPointRewardCost";
 
 export class ChannelPointRewardHandler {
   static async handle(event: TwitchEvent): Promise<void> {
-    const payload = event.payload as
+    const raw = event.payload as
+      | { event?: unknown }
       | ChannelPointsCustomRewardPayload
       | ChannelPointsAutomaticRewardPayload;
+    const payload = (
+      raw && typeof raw === "object" && "event" in raw && raw.event
+        ? (raw as { event: unknown }).event
+        : raw
+    ) as ChannelPointsCustomRewardPayload | ChannelPointsAutomaticRewardPayload;
     logger.debug("Processing channel point reward event", {
       eventId: event.id,
       type: event.type,
@@ -38,6 +44,16 @@ export class ChannelPointRewardHandler {
       channelLogin: event.channelLogin,
       userLogin: event.userLogin,
     };
+    if (!payload.reward) {
+      logger.warn("Missing reward in payload", {
+        eventId: event.id,
+        type: event.type,
+        channel: event.channelLogin,
+        user: event.userLogin,
+        context: "channel-points-handler",
+      });
+      return;
+    }
     if ("id" in payload.reward) {
       await this.handleCountChannelPointRewardUse(
         userId,
