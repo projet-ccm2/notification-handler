@@ -1,6 +1,7 @@
 import type { TwitchEvent, MessagePayload } from "../types";
 import { CacheDbService, EventCtx } from "../services/cache-db-service";
 import { logger } from "../utils/logger";
+import { UserExistenceCache } from "../services/user-existence-cache";
 
 const COUNT_MESSAGE_TYPE = "countMessage";
 const CONTENT_MESSAGE_TYPE = "contentMessage";
@@ -18,6 +19,16 @@ export class MessageHandler {
         channel: event.channelLogin,
         user: event.userLogin,
         message: messageContent,
+        context: "message-handler",
+      });
+      return;
+    }
+    if (!(await UserExistenceCache.exists(userId))) {
+      logger.warn("Skipping event: user not in DB", {
+        eventId: event.id,
+        channel: event.channelLogin,
+        user: event.userLogin,
+        userId,
         context: "message-handler",
       });
       return;

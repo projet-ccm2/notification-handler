@@ -41,7 +41,12 @@ describe("Production Server", () => {
   let originalProcessExit: typeof process.exit;
   let originalProcessOn: typeof process.on;
   let mockServer: { close: jest.Mock };
-  let mockApp: { listen: jest.Mock; get: jest.Mock; disable: jest.Mock; use: jest.Mock };
+  let mockApp: {
+    listen: jest.Mock;
+    get: jest.Mock;
+    disable: jest.Mock;
+    use: jest.Mock;
+  };
 
   beforeEach(() => {
     originalEnv = process.env.NODE_ENV;

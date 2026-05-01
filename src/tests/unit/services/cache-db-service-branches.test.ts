@@ -962,8 +962,12 @@ describe("CacheDbService branches", () => {
           typeAchievement: { id: "t1", label: "points", data: "{}" },
         },
       ]);
-      const TwitchChat = jest.requireMock("../../../services/twitch-chat-service");
-      const Discord = jest.requireMock("../../../services/discord-notification-service");
+      const TwitchChat = jest.requireMock(
+        "../../../services/twitch-chat-service",
+      );
+      const Discord = jest.requireMock(
+        "../../../services/discord-notification-service",
+      );
 
       const ua = new UserAchievement(
         "a1",
@@ -991,16 +995,12 @@ describe("CacheDbService branches", () => {
 
       expect(DbService.addExpToUser).toHaveBeenCalledWith("u1", 50);
       expect(BadgeService.tryGrantBadge).toHaveBeenCalled();
-      expect(TwitchChat.TwitchChatService.sendAchievementUnlocked).toHaveBeenCalledWith(
-        "chan",
-        "user",
-        "Trophy",
-      );
-      expect(Discord.DiscordNotificationService.sendAchievementUnlocked).toHaveBeenCalledWith(
-        "ch1",
-        "user",
-        "Trophy",
-      );
+      expect(
+        TwitchChat.TwitchChatService.sendAchievementUnlocked,
+      ).toHaveBeenCalledWith("chan", "user", "Trophy");
+      expect(
+        Discord.DiscordNotificationService.sendAchievementUnlocked,
+      ).toHaveBeenCalledWith("ch1", "user", "Trophy");
     });
 
     it("update throws when achieved is null", async () => {

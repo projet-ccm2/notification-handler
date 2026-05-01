@@ -538,14 +538,17 @@ export class CacheDbService {
         await RedisService.delete(`${this.FLUSH_FAILURES_PREFIX}${cacheKey}`);
       } catch (error) {
         const failuresKey = `${this.FLUSH_FAILURES_PREFIX}${cacheKey}`;
-        const previous =
-          (await RedisService.get<number>(failuresKey)) ?? 0;
+        const previous = (await RedisService.get<number>(failuresKey)) ?? 0;
         const failures = previous + 1;
         const backoffSeconds = Math.min(
           this.FLUSH_BACKOFF_BASE_SECONDS * 2 ** (failures - 1),
           this.FLUSH_BACKOFF_MAX_SECONDS,
         );
-        await RedisService.set(failuresKey, failures, this.FLUSH_BACKOFF_MAX_SECONDS * 2);
+        await RedisService.set(
+          failuresKey,
+          failures,
+          this.FLUSH_BACKOFF_MAX_SECONDS * 2,
+        );
         await RedisService.set(
           `${this.FLUSH_BACKOFF_PREFIX}${cacheKey}`,
           1,

@@ -98,6 +98,13 @@ export class DbService {
     return fetchJson<User>(`${config.dbGateway.baseUrl}/users/${userId}`);
   }
 
+  static async userExists(userId: string): Promise<boolean> {
+    const user = await fetchJsonOrNull<User>(
+      `${config.dbGateway.baseUrl}/users/${userId}`,
+    );
+    return user !== null;
+  }
+
   static async addExpToUser(userId: string, amount: number): Promise<void> {
     const user = await this.getUser(userId);
     const currentExp = user.exp ?? 0;

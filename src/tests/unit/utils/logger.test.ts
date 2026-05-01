@@ -1,14 +1,17 @@
 import { logger } from "../../../utils/logger";
 
 jest.mock("winston", () => {
-  const format = Object.assign(jest.fn(() => jest.fn()), {
-    combine: jest.fn(),
-    timestamp: jest.fn(),
-    errors: jest.fn(),
-    json: jest.fn(),
-    colorize: jest.fn(),
-    simple: jest.fn(),
-  });
+  const format = Object.assign(
+    jest.fn(() => jest.fn()),
+    {
+      combine: jest.fn(),
+      timestamp: jest.fn(),
+      errors: jest.fn(),
+      json: jest.fn(),
+      colorize: jest.fn(),
+      simple: jest.fn(),
+    },
+  );
   return {
     createLogger: jest.fn(() => ({
       info: jest.fn(),
