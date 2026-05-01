@@ -96,12 +96,12 @@ export class ChannelPointRewardHandler {
       channelId,
       idChannelPointReward,
       count: achievements.length,
-      labels: achievements.map((a) => a.label),
+      typeData: achievements.map((a) => a.typeAchievement.data),
       context: "channel-points-handler",
     });
     let matched = 0;
     for (const ua of achievements) {
-      if (ua.label === idChannelPointReward) {
+      if (ua.typeAchievement.data === idChannelPointReward) {
         ua.achieved.count += 1;
         ua.achieved.finished = ua.achieved.count >= ua.goal;
         await CacheDbService.update(ua, ctx);

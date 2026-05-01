@@ -133,15 +133,15 @@ describe("ChannelPointRewardHandler", () => {
   });
 
   describe("handleCountChannelPointRewardUse", () => {
-    it("updates achievement when label matches idChannelPointReward", async () => {
+    it("updates achievement when typeAchievement.data matches idChannelPointReward", async () => {
       const ua = new UserAchievement(
         "a1",
         "Use reward",
         "desc",
         5,
         50,
-        "reward-123",
-        { id: "t1", label: "countRedeemChannelPoint", data: "{}" },
+        " ",
+        { id: "t1", label: "countRedeemChannelPoint", data: "reward-123" },
         UserAchievement.defaultAchieved("a1", "u1"),
         "ch1",
       );
@@ -158,15 +158,15 @@ describe("ChannelPointRewardHandler", () => {
       expect(CacheDbService.update).toHaveBeenCalledWith(ua, {});
     });
 
-    it("does not update when label does not match", async () => {
+    it("does not update when typeAchievement.data does not match", async () => {
       const ua = new UserAchievement(
         "a1",
         "Use reward",
         "desc",
         5,
         50,
-        "other-reward",
-        { id: "t1", label: "countRedeemChannelPoint", data: "{}" },
+        " ",
+        { id: "t1", label: "countRedeemChannelPoint", data: "other-reward" },
         UserAchievement.defaultAchieved("a1", "u1"),
         "ch1",
       );
