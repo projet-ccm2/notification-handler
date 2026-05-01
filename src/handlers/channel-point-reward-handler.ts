@@ -6,8 +6,8 @@ import {
   ChannelPointsAutomaticRewardPayload,
 } from "../types/payloads";
 
-const COUNT_CHANNEL_POINT_REWARD_USE_TYPE = "countChannelPointReward";
-const COUNT_CHANNEL_POINT_REWARD_COST_TYPE = "countChannelPointRewardCost";
+const COUNT_CHANNEL_POINT_REWARD_USE_TYPE = "countRedeemChannelPoint";
+const COUNT_CHANNEL_POINT_REWARD_COST_TYPE = "countCostChannelPoint";
 
 export class ChannelPointRewardHandler {
   static async handle(event: TwitchEvent): Promise<void> {

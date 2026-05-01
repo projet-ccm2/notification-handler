@@ -309,12 +309,13 @@ describe("CacheDbService branches", () => {
 
     it("skips when lock not acquired", async () => {
       Redis.getPendingSyncKeys.mockResolvedValue(["user_achieved:u3:ch3"]);
+      Redis.getTtl.mockResolvedValue(0);
       Redis.acquireLock.mockResolvedValue(false);
 
       await CacheDbService.refreshExpiredCacheEntries();
 
-      expect(Redis.getTtl).not.toHaveBeenCalled();
       expect(DbService.saveAchieved).not.toHaveBeenCalled();
+      expect(Redis.getAllSyncDataForCacheKey).not.toHaveBeenCalled();
     });
 
     it("continues when ttl > 0", async () => {

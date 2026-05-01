@@ -1,24 +1,27 @@
 import { logger } from "../../../utils/logger";
 
-jest.mock("winston", () => ({
-  createLogger: jest.fn(() => ({
-    info: jest.fn(),
-    error: jest.fn(),
-    warn: jest.fn(),
-    debug: jest.fn(),
-  })),
-  format: {
+jest.mock("winston", () => {
+  const format = Object.assign(jest.fn(() => jest.fn()), {
     combine: jest.fn(),
     timestamp: jest.fn(),
     errors: jest.fn(),
     json: jest.fn(),
     colorize: jest.fn(),
     simple: jest.fn(),
-  },
-  transports: {
-    Console: jest.fn(),
-  },
-}));
+  });
+  return {
+    createLogger: jest.fn(() => ({
+      info: jest.fn(),
+      error: jest.fn(),
+      warn: jest.fn(),
+      debug: jest.fn(),
+    })),
+    format,
+    transports: {
+      Console: jest.fn(),
+    },
+  };
+});
 
 describe("Logger", () => {
   it("should export logger instance", () => {

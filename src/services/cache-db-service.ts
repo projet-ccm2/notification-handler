@@ -502,10 +502,22 @@ export class CacheDbService {
     );
   }
 
+  private static readonly FLUSH_BACKOFF_PREFIX = "flush:backoff:";
+  private static readonly FLUSH_FAILURES_PREFIX = "flush:failures:";
+  private static readonly FLUSH_BACKOFF_BASE_SECONDS = 30;
+  private static readonly FLUSH_BACKOFF_MAX_SECONDS = 600;
+
   static async refreshExpiredCacheEntries(force = false): Promise<void> {
     const pendingKeys = await RedisService.getPendingSyncKeys();
 
     for (const cacheKey of pendingKeys) {
+      if (!force) {
+        const backoffTtl = await RedisService.getTtl(
+          `${this.FLUSH_BACKOFF_PREFIX}${cacheKey}`,
+        );
+        if (backoffTtl > 0) continue;
+      }
+
       const lockKey = `sync:lock:${cacheKey}`;
       const lockToken = await RedisService.acquireLock(lockKey, 30);
 
@@ -575,10 +587,27 @@ export class CacheDbService {
           );
           p.del(RedisService.buildKey(cacheKey));
         });
+        await RedisService.delete(`${this.FLUSH_FAILURES_PREFIX}${cacheKey}`);
       } catch (error) {
+        const failuresKey = `${this.FLUSH_FAILURES_PREFIX}${cacheKey}`;
+        const previous =
+          (await RedisService.get<number>(failuresKey)) ?? 0;
+        const failures = previous + 1;
+        const backoffSeconds = Math.min(
+          this.FLUSH_BACKOFF_BASE_SECONDS * 2 ** (failures - 1),
+          this.FLUSH_BACKOFF_MAX_SECONDS,
+        );
+        await RedisService.set(failuresKey, failures, this.FLUSH_BACKOFF_MAX_SECONDS * 2);
+        await RedisService.set(
+          `${this.FLUSH_BACKOFF_PREFIX}${cacheKey}`,
+          1,
+          backoffSeconds,
+        );
         logger.error("Failed to flush cache key to DB", {
           cacheKey,
           error: error instanceof Error ? error.message : String(error),
+          failures,
+          backoffSeconds,
           context: "cache-sync",
         });
       } finally {

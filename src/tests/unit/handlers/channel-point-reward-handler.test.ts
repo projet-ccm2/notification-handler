@@ -91,12 +91,12 @@ describe("ChannelPointRewardHandler", () => {
     expect(CacheDbService.getAchievements).toHaveBeenCalledWith(
       "ch1",
       "u1",
-      "countChannelPointReward",
+      "countRedeemChannelPoint",
     );
     expect(CacheDbService.getAchievements).toHaveBeenCalledWith(
       "ch1",
       "u1",
-      "countChannelPointRewardCost",
+      "countCostChannelPoint",
     );
   });
 
@@ -123,12 +123,12 @@ describe("ChannelPointRewardHandler", () => {
     expect(CacheDbService.getAchievements).toHaveBeenCalledWith(
       "ch1",
       "u1",
-      "countChannelPointRewardCost",
+      "countCostChannelPoint",
     );
     expect(CacheDbService.getAchievements).not.toHaveBeenCalledWith(
       "ch1",
       "u1",
-      "countChannelPointReward",
+      "countRedeemChannelPoint",
     );
   });
 
@@ -141,7 +141,7 @@ describe("ChannelPointRewardHandler", () => {
         5,
         50,
         "reward-123",
-        { id: "t1", label: "countChannelPointReward", data: "{}" },
+        { id: "t1", label: "countRedeemChannelPoint", data: "{}" },
         UserAchievement.defaultAchieved("a1", "u1"),
         "ch1",
       );
@@ -166,7 +166,7 @@ describe("ChannelPointRewardHandler", () => {
         5,
         50,
         "other-reward",
-        { id: "t1", label: "countChannelPointReward", data: "{}" },
+        { id: "t1", label: "countRedeemChannelPoint", data: "{}" },
         UserAchievement.defaultAchieved("a1", "u1"),
         "ch1",
       );
@@ -192,7 +192,7 @@ describe("ChannelPointRewardHandler", () => {
         1000,
         100,
         "label",
-        { id: "t1", label: "countChannelPointRewardCost", data: "{}" },
+        { id: "t1", label: "countCostChannelPoint", data: "{}" },
         UserAchievement.defaultAchieved("a1", "u1"),
         "ch1",
       );
@@ -220,7 +220,7 @@ describe("ChannelPointRewardHandler", () => {
         1000,
         100,
         "label",
-        { id: "t1", label: "countChannelPointRewardCost", data: "{}" },
+        { id: "t1", label: "countCostChannelPoint", data: "{}" },
         achieved,
         "ch1",
       );
