@@ -54,9 +54,27 @@ export class CacheDbService {
         channelId,
       ),
     );
-    return merged.filter(
+    const filtered = merged.filter(
       (u) => u.typeAchievement.label === typeAchievementLabel,
     );
+    logger.info("mergeAndFilter result", {
+      channelId,
+      userId,
+      typeAchievementLabel,
+      definitionsCount: definitions.length,
+      defsWithTypeCount: defsWithType.length,
+      defsTypeLabels: defsWithType.map((d) => d.typeAchievement.label),
+      defsLabels: defsWithType.map((d) => d.label),
+      achievedCount: achievedList.length,
+      mergedCount: merged.length,
+      filteredCount: filtered.length,
+      definitions,
+      achievedList,
+      merged,
+      filtered,
+      context: "cache-db",
+    });
+    return filtered;
   }
 
   private static async tryGetFromCache(

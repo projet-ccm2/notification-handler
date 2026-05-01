@@ -65,7 +65,17 @@ export class DbService {
     const raw = await fetchJson<AchievementWithType[]>(
       `${config.dbGateway.baseUrl}/achievements/channel/${channelId}`,
     );
-    return raw.filter((a) => a.typeAchievement != null);
+    const filtered = raw.filter((a) => a.typeAchievement != null);
+    logger.info("DB getAchievements", {
+      channelId,
+      rawCount: raw.length,
+      filteredCount: filtered.length,
+      rawTypeLabels: raw.map((a) => a.typeAchievement?.label ?? null),
+      rawLabels: raw.map((a) => a.label),
+      raw,
+      context: "db-gateway",
+    });
+    return filtered;
   }
 
   static async getUserAchievements(
@@ -75,6 +85,17 @@ export class DbService {
     const res = await fetchJson<UserAchievementsResponse>(
       `${config.dbGateway.baseUrl}/achievements/user/${userId}/channel/${channelId}`,
     );
+    logger.info("DB getUserAchievements", {
+      userId,
+      channelId,
+      count: res.achievements.length,
+      typeLabels: res.achievements.map(
+        (a) => a.typeAchievement?.label ?? null,
+      ),
+      labels: res.achievements.map((a) => a.label),
+      achievements: res.achievements,
+      context: "db-gateway",
+    });
     return res.achievements;
   }
 

@@ -12,6 +12,10 @@ const LEVEL_TO_GCP_SEVERITY: Record<string, string> = {
 
 const gcpSeverity = winston.format((info) => {
   info.severity = LEVEL_TO_GCP_SEVERITY[info.level] ?? "DEFAULT";
+  if (info.message instanceof Error) {
+    info.stack_trace = info.message.stack;
+    info.message = info.message.message;
+  }
   return info;
 });
 
