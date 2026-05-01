@@ -48,12 +48,22 @@ export class ChannelPointRewardHandler {
       logger.warn("Missing reward in payload", {
         eventId: event.id,
         type: event.type,
+        payloadKeys: Object.keys((event.payload as object) ?? {}),
         channel: event.channelLogin,
         user: event.userLogin,
         context: "channel-points-handler",
       });
       return;
     }
+    logger.info("Channel point reward parsed", {
+      eventId: event.id,
+      type: event.type,
+      rewardId: "id" in payload.reward ? payload.reward.id : undefined,
+      rewardCost: payload.reward.cost,
+      userId,
+      channelId,
+      context: "channel-points-handler",
+    });
     if ("id" in payload.reward) {
       await this.handleCountChannelPointRewardUse(
         userId,
@@ -81,12 +91,30 @@ export class ChannelPointRewardHandler {
       userId,
       COUNT_CHANNEL_POINT_REWARD_USE_TYPE,
     );
+    logger.info("Channel point USE achievements fetched", {
+      userId,
+      channelId,
+      idChannelPointReward,
+      count: achievements.length,
+      labels: achievements.map((a) => a.label),
+      context: "channel-points-handler",
+    });
+    let matched = 0;
     for (const ua of achievements) {
       if (ua.label === idChannelPointReward) {
         ua.achieved.count += 1;
         ua.achieved.finished = ua.achieved.count >= ua.goal;
         await CacheDbService.update(ua, ctx);
+        matched++;
       }
+    }
+    if (matched === 0) {
+      logger.warn("No USE achievement matched reward id", {
+        userId,
+        channelId,
+        idChannelPointReward,
+        context: "channel-points-handler",
+      });
     }
   }
 
@@ -101,6 +129,13 @@ export class ChannelPointRewardHandler {
       userId,
       COUNT_CHANNEL_POINT_REWARD_COST_TYPE,
     );
+    logger.info("Channel point COST achievements fetched", {
+      userId,
+      channelId,
+      costChannelPointReward,
+      count: achievements.length,
+      context: "channel-points-handler",
+    });
     for (const ua of achievements) {
       ua.achieved.count += costChannelPointReward;
       ua.achieved.finished = ua.achieved.count >= ua.goal;
