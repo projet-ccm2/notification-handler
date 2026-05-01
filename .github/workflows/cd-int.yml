@@ -1,0 +1,41 @@
+name: Deploy to Integration
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      image-tag:
+        description: "Docker image tag to deploy (default: int-{sha})"
+        required: false
+        type: string
+        default: ""
+      run-tests:
+        description: "Run integration tests after deployment"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  deploy-int:
+    name: Deploy to Integration
+    uses: projet-ccm2/shared-workflows/.github/workflows/nodejs-cd.yml@main
+    if: github.event_name != 'pull_request'
+    with:
+      required_env_vars: GCP_SA_KEY,GCP_PROJECT_ID,TWITCH_CLIENT_ID,ALLOWED_ORIGINS,DB_SERVICE_URL,REDIS_URL,CACHE_TTL,TWITCH_LISTENER_URL,CHAT_API_KEY,DISCORD_NOTIF_URL
+      docker-image-name: notification-handler-api-int
+      docker-tag: ${{ github.event.inputs.image-tag || format('dev-{0}', github.sha) }}
+      artifact-registry-repository: "notification-handler-docker-int"
+      environment: integration
+      cloud-run-service-name: notification-handler-int
+    secrets:
+      GCP_SA_KEY: ${{ secrets.INT_GCP_SA_KEY }}
+      GCP_PROJECT_ID: ${{ secrets.INT_GCP_PROJECT_ID }}
+      TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+      ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS_INT }}
+      DB_SERVICE_URL: ${{ secrets.INT_DB_SERVICE_URL }}
+      REDIS_URL: ${{ secrets.REDIS_URL }}
+      CACHE_TTL: ${{ secrets.CACHE_TTL }}
+      TWITCH_LISTENER_URL: ${{ secrets.INT_TWITCH_LISTENER_URL }}
+      CHAT_API_KEY: ${{ secrets.INT_CHAT_API_KEY }}
+      DISCORD_NOTIF_URL: ${{ secrets.INT_DISCORD_NOTIF_URL }}
