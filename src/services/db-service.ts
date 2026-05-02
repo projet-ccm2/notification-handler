@@ -89,9 +89,7 @@ export class DbService {
       userId,
       channelId,
       count: res.achievements.length,
-      typeLabels: res.achievements.map(
-        (a) => a.typeAchievement?.label ?? null,
-      ),
+      typeLabels: res.achievements.map((a) => a.typeAchievement?.label ?? null),
       labels: res.achievements.map((a) => a.label),
       achievements: res.achievements,
       context: "db-gateway",
@@ -127,6 +125,13 @@ export class DbService {
 
   static async getUser(userId: string): Promise<User> {
     return fetchJson<User>(`${config.dbGateway.baseUrl}/users/${userId}`);
+  }
+
+  static async userExists(userId: string): Promise<boolean> {
+    const user = await fetchJsonOrNull<User>(
+      `${config.dbGateway.baseUrl}/users/${userId}`,
+    );
+    return user !== null;
   }
 
   static async addExpToUser(userId: string, amount: number): Promise<void> {

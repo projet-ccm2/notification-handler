@@ -14,11 +14,19 @@ jest.mock("../../../utils/logger", () => ({
 
 jest.mock("../../../services/cache-db-service");
 
+jest.mock("../../../services/user-existence-cache", () => ({
+  UserExistenceCache: { exists: jest.fn() },
+}));
+
 const { logger } = require("../../../utils/logger");
+const {
+  UserExistenceCache,
+} = require("../../../services/user-existence-cache");
 
 describe("MessageHandler", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(UserExistenceCache.exists).mockResolvedValue(true);
   });
 
   it("calls logger.debug with event and payload message", async () => {
@@ -65,6 +73,31 @@ describe("MessageHandler", () => {
       expect.any(Object),
     );
     expect(CacheDbService.getAchievements).not.toHaveBeenCalled();
+  });
+
+  it("skips processing when user does not exist in DB", async () => {
+    jest.mocked(UserExistenceCache.exists).mockResolvedValue(false);
+
+    const event: TwitchEvent = {
+      id: "e1",
+      type: "message",
+      source: "twitch",
+      timestamp: "2025-01-01T00:00:00Z",
+      channelLogin: "chan",
+      userLogin: "user",
+      channelId: "ch1",
+      userId: "u1",
+      payload: { message: "hello" },
+    };
+
+    await MessageHandler.handle(event);
+
+    expect(UserExistenceCache.exists).toHaveBeenCalledWith("u1");
+    expect(CacheDbService.getAchievements).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledWith(
+      "Skipping event: user not in DB",
+      expect.any(Object),
+    );
   });
 
   it("calls handleCountMessages and handleMessageContent when all params present", async () => {

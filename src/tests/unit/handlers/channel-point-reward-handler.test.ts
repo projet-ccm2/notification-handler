@@ -14,11 +14,19 @@ jest.mock("../../../utils/logger", () => ({
 
 jest.mock("../../../services/cache-db-service");
 
+jest.mock("../../../services/user-existence-cache", () => ({
+  UserExistenceCache: { exists: jest.fn() },
+}));
+
 const { logger } = require("../../../utils/logger");
+const {
+  UserExistenceCache,
+} = require("../../../services/user-existence-cache");
 
 describe("ChannelPointRewardHandler", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(UserExistenceCache.exists).mockResolvedValue(true);
   });
 
   it("calls logger.debug with event details", async () => {
@@ -69,6 +77,31 @@ describe("ChannelPointRewardHandler", () => {
       expect.any(Object),
     );
     expect(CacheDbService.getAchievements).not.toHaveBeenCalled();
+  });
+
+  it("skips processing when user does not exist in DB", async () => {
+    jest.mocked(UserExistenceCache.exists).mockResolvedValue(false);
+
+    const event: TwitchEvent = {
+      id: "e1",
+      type: "channel.channel_points_custom_reward_redemption.add",
+      source: "twitch",
+      timestamp: "2025-01-01T00:00:00Z",
+      channelLogin: "chan",
+      userLogin: "user",
+      channelId: "ch1",
+      userId: "u1",
+      payload: { reward: { id: "r1", cost: 100 } },
+    };
+
+    await ChannelPointRewardHandler.handle(event);
+
+    expect(UserExistenceCache.exists).toHaveBeenCalledWith("u1");
+    expect(CacheDbService.getAchievements).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledWith(
+      "Skipping event: user not in DB",
+      expect.any(Object),
+    );
   });
 
   it("calls handleCountChannelPointRewardUse when payload has reward.id (custom reward)", async () => {

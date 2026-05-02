@@ -17,6 +17,8 @@ type DefinitionWithType = AchievementWithType & {
   typeAchievement: TypeAchievement;
 };
 
+export type EventCtx = { channelLogin?: string; userLogin?: string };
+
 export class CacheDbService {
   private static readonly CACHE_PREFIX_ACHIEVEMENTS = "achievements:";
   private static readonly CACHE_PREFIX_USER_ACHIEVED = "user_achieved:";
@@ -100,35 +102,46 @@ export class CacheDbService {
     );
   }
 
+  private static async loadFromDb(
+    channelId: string,
+    userId: string,
+  ): Promise<{ definitions: AchievementWithType[]; achievedList: Achieved[] }> {
+    const apiResponse = await DbService.getUserAchievements(userId, channelId);
+    const itemsWithType = apiResponse.filter(
+      (item) => item.typeAchievement != null,
+    );
+    if (itemsWithType.length === 0) {
+      return {
+        definitions: await DbService.getAchievements(channelId),
+        achievedList: [],
+      };
+    }
+    return {
+      definitions: itemsWithType.map((item) => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        goal: item.goal,
+        reward: item.reward,
+        label: item.label,
+        typeAchievement: item.typeAchievement,
+      })),
+      achievedList: itemsWithType.map(
+        (item) =>
+          item.achieved ?? UserAchievement.defaultAchieved(item.id, userId),
+      ),
+    };
+  }
+
   private static async fetchFromDb(
     channelId: string,
     userId: string,
     typeAchievement: string,
   ): Promise<UserAchievement[]> {
-    const apiResponse = await DbService.getUserAchievements(userId, channelId);
-    const itemsWithType =
-      apiResponse.length === 0
-        ? []
-        : apiResponse.filter((item) => item.typeAchievement != null);
-    const definitions =
-      itemsWithType.length === 0
-        ? await DbService.getAchievements(channelId)
-        : itemsWithType.map((item) => ({
-            id: item.id,
-            title: item.title,
-            description: item.description,
-            goal: item.goal,
-            reward: item.reward,
-            label: item.label,
-            typeAchievement: item.typeAchievement,
-          }));
-    const achievedList =
-      itemsWithType.length === 0
-        ? []
-        : itemsWithType.map(
-            (item) =>
-              item.achieved ?? UserAchievement.defaultAchieved(item.id, userId),
-          );
+    const { definitions, achievedList } = await this.loadFromDb(
+      channelId,
+      userId,
+    );
     return this.mergeAndFilter(
       definitions,
       achievedList,
@@ -154,34 +167,12 @@ export class CacheDbService {
     );
     if (cached) return cached;
 
-    const apiResponse = await DbService.getUserAchievements(userId, channelId);
-    const itemsWithType =
-      apiResponse.length === 0
-        ? []
-        : apiResponse.filter((item) => item.typeAchievement != null);
-    const definitions =
-      itemsWithType.length === 0
-        ? await DbService.getAchievements(channelId)
-        : itemsWithType.map((item) => ({
-            id: item.id,
-            title: item.title,
-            description: item.description,
-            goal: item.goal,
-            reward: item.reward,
-            label: item.label,
-            typeAchievement: item.typeAchievement,
-          }));
-    const achievedList =
-      itemsWithType.length === 0
-        ? []
-        : itemsWithType.map(
-            (item) =>
-              item.achieved ?? UserAchievement.defaultAchieved(item.id, userId),
-          );
-
+    const { definitions, achievedList } = await this.loadFromDb(
+      channelId,
+      userId,
+    );
     await RedisService.set(cacheKeyAchievements, definitions, this.CACHE_TTL);
     await RedisService.set(cacheKeyUser, achievedList, this.CACHE_TTL);
-
     return this.mergeAndFilter(
       definitions,
       achievedList,
@@ -262,7 +253,7 @@ export class CacheDbService {
     userId: string,
     channelId: string,
     newList: Achieved[],
-    ctx: { channelLogin?: string; userLogin?: string },
+    ctx: EventCtx,
   ): Promise<void> {
     let definitions = await RedisService.get<AchievementWithType[]>(
       this.buildAchievementsCacheKey(channelId),
@@ -285,7 +276,7 @@ export class CacheDbService {
 
   private static async updateDirectToDb(
     userAchievement: UserAchievement,
-    ctx: { channelLogin?: string; userLogin?: string },
+    ctx: EventCtx,
   ): Promise<void> {
     if (!userAchievement.achieved)
       throw new Error("UserAchievement.achieved is required for update");
@@ -367,7 +358,7 @@ export class CacheDbService {
     userAchievement: UserAchievement,
     userId: string,
     channelId: string,
-    ctx: { channelLogin?: string; userLogin?: string },
+    ctx: EventCtx,
   ): Promise<void> {
     let achievedList = await RedisService.get<Achieved[]>(cacheKey);
     if (achievedList === null) {
@@ -461,7 +452,7 @@ export class CacheDbService {
 
   static async update(
     userAchievement: UserAchievement,
-    ctx: { channelLogin?: string; userLogin?: string } = {},
+    ctx: EventCtx = {},
   ): Promise<void> {
     if (!RedisService.isAvailable()) {
       return this.updateDirectToDb(userAchievement, ctx);
@@ -507,6 +498,108 @@ export class CacheDbService {
   private static readonly FLUSH_BACKOFF_BASE_SECONDS = 30;
   private static readonly FLUSH_BACKOFF_MAX_SECONDS = 600;
 
+  private static async flushCacheKey(
+    cacheKey: string,
+    force: boolean,
+  ): Promise<void> {
+    const lockKey = `sync:lock:${cacheKey}`;
+    const lockToken = await RedisService.acquireLock(lockKey, 30);
+    if (!lockToken) return;
+
+    try {
+      const ttl = await RedisService.getTtl(cacheKey);
+      if (!force && ttl > 0) return;
+
+      logger.debug("Cache TTL expired, starting flush to DB", {
+        cacheKey,
+        ttl,
+        context: "cache-sync",
+      });
+
+      const syncDataList =
+        await RedisService.getAllSyncDataForCacheKey(cacheKey);
+
+      if (syncDataList.length === 0) {
+        logger.debug("No sync data to flush, removing from sync set", {
+          cacheKey,
+          context: "cache-sync",
+        });
+        await RedisService.removeFromSyncSet(cacheKey);
+        return;
+      }
+
+      for (const syncData of syncDataList) {
+        const data = syncData.data as SyncDataForAchievement;
+        if (data.rewardToAdd != null) {
+          logger.debug("Flushing exp to DB gateway", {
+            userId: syncData.userId,
+            rewardToAdd: data.rewardToAdd,
+            context: "cache-sync",
+          });
+          await DbService.addExpToUser(syncData.userId, data.rewardToAdd);
+        }
+        logger.debug("Flushing achieved to DB gateway", {
+          userId: syncData.userId,
+          achievementId: syncData.achievementId,
+          context: "cache-sync",
+        });
+        await DbService.saveAchieved({
+          achievementId: syncData.achievementId,
+          userId: syncData.userId,
+          count: data.count,
+          finished: data.finished,
+          labelActive: data.labelActive,
+          acquiredDate: data.acquiredDate,
+        });
+      }
+
+      logger.debug("Flush complete, cleaning up sync data", {
+        cacheKey,
+        syncedCount: syncDataList.length,
+        context: "cache-sync",
+      });
+      const syncKeys = await RedisService.getSyncDataKeys(cacheKey);
+      await RedisService.execPipeline((p) => {
+        for (const k of syncKeys) {
+          p.del(RedisService.buildKey(k));
+        }
+        p.sRem(
+          RedisService.buildKey("sync:pending"),
+          RedisService.buildKey(cacheKey),
+        );
+        p.del(RedisService.buildKey(cacheKey));
+      });
+      await RedisService.delete(`${this.FLUSH_FAILURES_PREFIX}${cacheKey}`);
+    } catch (error) {
+      const failuresKey = `${this.FLUSH_FAILURES_PREFIX}${cacheKey}`;
+      const previous = (await RedisService.get<number>(failuresKey)) ?? 0;
+      const failures = previous + 1;
+      const backoffSeconds = Math.min(
+        this.FLUSH_BACKOFF_BASE_SECONDS * 2 ** (failures - 1),
+        this.FLUSH_BACKOFF_MAX_SECONDS,
+      );
+      await RedisService.set(
+        failuresKey,
+        failures,
+        this.FLUSH_BACKOFF_MAX_SECONDS * 2,
+      );
+      await RedisService.set(
+        `${this.FLUSH_BACKOFF_PREFIX}${cacheKey}`,
+        1,
+        backoffSeconds,
+      );
+      logger.error("Failed to flush cache key to DB", {
+        cacheKey,
+        error: error instanceof Error ? error.message : String(error),
+        failures,
+        backoffSeconds,
+        context: "cache-sync",
+      });
+    } finally {
+      await RedisService.releaseLock(lockKey, lockToken);
+    }
+  }
+
   static async refreshExpiredCacheEntries(force = false): Promise<void> {
     const pendingKeys = await RedisService.getPendingSyncKeys();
 
@@ -518,101 +611,7 @@ export class CacheDbService {
         if (backoffTtl > 0) continue;
       }
 
-      const lockKey = `sync:lock:${cacheKey}`;
-      const lockToken = await RedisService.acquireLock(lockKey, 30);
-
-      if (!lockToken) continue;
-
-      try {
-        const ttl = await RedisService.getTtl(cacheKey);
-
-        if (!force && ttl > 0) continue;
-
-        logger.debug("Cache TTL expired, starting flush to DB", {
-          cacheKey,
-          ttl,
-          context: "cache-sync",
-        });
-
-        const syncDataList =
-          await RedisService.getAllSyncDataForCacheKey(cacheKey);
-
-        if (syncDataList.length === 0) {
-          logger.debug("No sync data to flush, removing from sync set", {
-            cacheKey,
-            context: "cache-sync",
-          });
-          await RedisService.removeFromSyncSet(cacheKey);
-          continue;
-        }
-
-        for (const syncData of syncDataList) {
-          const data = syncData.data as SyncDataForAchievement;
-          if (data.rewardToAdd != null) {
-            logger.debug("Flushing exp to DB gateway", {
-              userId: syncData.userId,
-              rewardToAdd: data.rewardToAdd,
-              context: "cache-sync",
-            });
-            await DbService.addExpToUser(syncData.userId, data.rewardToAdd);
-          }
-          logger.debug("Flushing achieved to DB gateway", {
-            userId: syncData.userId,
-            achievementId: syncData.achievementId,
-            context: "cache-sync",
-          });
-          await DbService.saveAchieved({
-            achievementId: syncData.achievementId,
-            userId: syncData.userId,
-            count: data.count,
-            finished: data.finished,
-            labelActive: data.labelActive,
-            acquiredDate: data.acquiredDate,
-          });
-        }
-
-        logger.debug("Flush complete, cleaning up sync data", {
-          cacheKey,
-          syncedCount: syncDataList.length,
-          context: "cache-sync",
-        });
-        const syncKeys = await RedisService.getSyncDataKeys(cacheKey);
-        await RedisService.execPipeline((p) => {
-          for (const k of syncKeys) {
-            p.del(RedisService.buildKey(k));
-          }
-          p.sRem(
-            RedisService.buildKey("sync:pending"),
-            RedisService.buildKey(cacheKey),
-          );
-          p.del(RedisService.buildKey(cacheKey));
-        });
-        await RedisService.delete(`${this.FLUSH_FAILURES_PREFIX}${cacheKey}`);
-      } catch (error) {
-        const failuresKey = `${this.FLUSH_FAILURES_PREFIX}${cacheKey}`;
-        const previous =
-          (await RedisService.get<number>(failuresKey)) ?? 0;
-        const failures = previous + 1;
-        const backoffSeconds = Math.min(
-          this.FLUSH_BACKOFF_BASE_SECONDS * 2 ** (failures - 1),
-          this.FLUSH_BACKOFF_MAX_SECONDS,
-        );
-        await RedisService.set(failuresKey, failures, this.FLUSH_BACKOFF_MAX_SECONDS * 2);
-        await RedisService.set(
-          `${this.FLUSH_BACKOFF_PREFIX}${cacheKey}`,
-          1,
-          backoffSeconds,
-        );
-        logger.error("Failed to flush cache key to DB", {
-          cacheKey,
-          error: error instanceof Error ? error.message : String(error),
-          failures,
-          backoffSeconds,
-          context: "cache-sync",
-        });
-      } finally {
-        await RedisService.releaseLock(lockKey, lockToken);
-      }
+      await this.flushCacheKey(cacheKey, force);
     }
   }
 

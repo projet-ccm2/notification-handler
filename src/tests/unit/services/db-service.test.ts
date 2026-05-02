@@ -288,4 +288,46 @@ describe("DbService", () => {
       DbService.postPossesses("u1", "b1", "2025-01-01"),
     ).rejects.toThrow("HTTP 400");
   });
+
+  it("userExists returns true when API returns user", async () => {
+    const user = {
+      id: "u1",
+      username: "user1",
+      profileImageUrl: null,
+      channelDescription: null,
+      scope: null,
+      lastUpdateTimestamp: "2026-02-20T12:00:00.000Z",
+    };
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(user),
+    });
+
+    const result = await DbService.userExists("u1");
+    expect(result).toBe(true);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/users/u1"),
+      expect.any(Object),
+    );
+  });
+
+  it("userExists returns false on 404", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+    });
+
+    const result = await DbService.userExists("u1");
+    expect(result).toBe(false);
+  });
+
+  it("userExists throws on 500", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: "Server Error",
+    });
+    await expect(DbService.userExists("u1")).rejects.toThrow("HTTP 500");
+  });
 });

@@ -1,6 +1,7 @@
 import type { TwitchEvent, MessagePayload } from "../types";
-import { CacheDbService } from "../services/cache-db-service";
+import { CacheDbService, EventCtx } from "../services/cache-db-service";
 import { logger } from "../utils/logger";
+import { UserExistenceCache } from "../services/user-existence-cache";
 
 const COUNT_MESSAGE_TYPE = "countMessage";
 const CONTENT_MESSAGE_TYPE = "contentMessage";
@@ -29,6 +30,16 @@ export class MessageHandler {
       });
       return;
     }
+    if (!(await UserExistenceCache.exists(userId))) {
+      logger.warn("Skipping event: user not in DB", {
+        eventId: event.id,
+        channel: event.channelLogin,
+        user: event.userLogin,
+        userId,
+        context: "message-handler",
+      });
+      return;
+    }
     const ctx = {
       channelLogin: event.channelLogin,
       userLogin: event.userLogin,
@@ -40,7 +51,7 @@ export class MessageHandler {
   static async handleCountMessages(
     userId: string,
     channelId: string,
-    ctx: { channelLogin?: string; userLogin?: string } = {},
+    ctx: EventCtx = {},
   ): Promise<void> {
     const achievements = await CacheDbService.getAchievements(
       channelId,
@@ -70,7 +81,7 @@ export class MessageHandler {
     userId: string,
     channelId: string,
     message: string,
-    ctx: { channelLogin?: string; userLogin?: string } = {},
+    ctx: EventCtx = {},
   ): Promise<void> {
     const achievements = await CacheDbService.getAchievements(
       channelId,
@@ -91,9 +102,8 @@ export class MessageHandler {
       context: "message-handler",
     });
     const lowercaseMessage = message.toLowerCase();
-    let typeDataLowercase: string;
     for (const ua of achievements) {
-      typeDataLowercase = ua.typeAchievement.data.toLowerCase();
+      const typeDataLowercase = ua.typeAchievement.data.toLowerCase();
       if (lowercaseMessage.includes(typeDataLowercase)) {
         ua.achieved.count += 1;
         ua.achieved.finished = ua.achieved.count >= ua.goal;

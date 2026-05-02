@@ -31,6 +31,19 @@ jest.mock("../../../services/badge-service", () => ({
   },
 }));
 
+jest.mock("../../../services/twitch-chat-service", () => ({
+  TwitchChatService: {
+    sendAchievementUnlocked: jest.fn(),
+    sendBadgeGranted: jest.fn(),
+  },
+}));
+
+jest.mock("../../../services/discord-notification-service", () => ({
+  DiscordNotificationService: {
+    sendAchievementUnlocked: jest.fn(),
+  },
+}));
+
 const Redis = RedisService as jest.Mocked<typeof RedisService>;
 const { DbService } = require("../../../services/db-service");
 const { BadgeService } = require("../../../services/badge-service");
@@ -804,6 +817,270 @@ describe("CacheDbService branches", () => {
       await CacheDbService.clearCacheByChannelId("ch2");
 
       expect(Redis.execPipeline).toHaveBeenCalled();
+    });
+  });
+
+  describe("isAvailable=false fallback", () => {
+    beforeEach(() => {
+      Redis.isAvailable.mockReturnValue(false);
+    });
+
+    it("getAchievements falls back to fetchFromDb when Redis is unavailable", async () => {
+      DbService.getUserAchievements.mockResolvedValue([
+        {
+          id: "a1",
+          title: "T",
+          description: "D",
+          goal: 10,
+          reward: 5,
+          label: "L",
+          typeAchievement: { id: "t1", label: "points", data: "{}" },
+          achieved: {
+            achievementId: "a1",
+            userId: "u1",
+            count: 3,
+            finished: false,
+            labelActive: false,
+            acquiredDate: "",
+          },
+        },
+      ]);
+
+      const result = await CacheDbService.getAchievements(
+        "ch1",
+        "u1",
+        "points",
+      );
+
+      expect(DbService.getUserAchievements).toHaveBeenCalledWith("u1", "ch1");
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("a1");
+      expect(Redis.acquireLock).not.toHaveBeenCalled();
+    });
+
+    it("getAchievements falls back to DbService.getAchievements when no items have type", async () => {
+      DbService.getUserAchievements.mockResolvedValue([]);
+      DbService.getAchievements.mockResolvedValue([
+        {
+          id: "a1",
+          title: "T",
+          description: "D",
+          goal: 10,
+          reward: 5,
+          label: "L",
+          typeAchievement: { id: "t1", label: "points", data: "{}" },
+        },
+      ]);
+
+      const result = await CacheDbService.getAchievements(
+        "ch1",
+        "u1",
+        "points",
+      );
+
+      expect(DbService.getAchievements).toHaveBeenCalledWith("ch1");
+      expect(result).toHaveLength(1);
+    });
+
+    it("update falls back to direct DB write without new completion", async () => {
+      DbService.getUserAchievements.mockResolvedValue([
+        {
+          id: "a1",
+          title: "T",
+          description: "D",
+          goal: 10,
+          reward: 5,
+          label: "L",
+          typeAchievement: { id: "t1", label: "points", data: "{}" },
+          achieved: {
+            achievementId: "a1",
+            userId: "u1",
+            count: 3,
+            finished: false,
+            labelActive: false,
+            acquiredDate: "",
+          },
+        },
+      ]);
+
+      const ua = new UserAchievement(
+        "a1",
+        "T",
+        "D",
+        10,
+        5,
+        "L",
+        { id: "t1", label: "points", data: "{}" },
+        {
+          achievementId: "a1",
+          userId: "u1",
+          count: 4,
+          finished: false,
+          labelActive: false,
+          acquiredDate: "",
+        },
+        "ch1",
+      );
+
+      await CacheDbService.update(ua);
+
+      expect(DbService.saveAchieved).toHaveBeenCalledWith(
+        expect.objectContaining({ achievementId: "a1", count: 4 }),
+      );
+      expect(DbService.addExpToUser).not.toHaveBeenCalled();
+      expect(BadgeService.tryGrantBadge).not.toHaveBeenCalled();
+    });
+
+    it("update falls back to direct DB write with new completion: grants badge, adds exp, sends notifications", async () => {
+      DbService.getUserAchievements.mockResolvedValue([
+        {
+          id: "a1",
+          title: "Trophy",
+          description: "D",
+          goal: 10,
+          reward: 50,
+          label: "L",
+          typeAchievement: { id: "t1", label: "points", data: "{}" },
+          achieved: {
+            achievementId: "a1",
+            userId: "u1",
+            count: 9,
+            finished: false,
+            labelActive: false,
+            acquiredDate: "",
+          },
+        },
+      ]);
+      Redis.get.mockResolvedValue([
+        {
+          id: "a1",
+          title: "Trophy",
+          description: "D",
+          goal: 10,
+          reward: 50,
+          label: "L",
+          typeAchievement: { id: "t1", label: "points", data: "{}" },
+        },
+      ]);
+      const TwitchChat = jest.requireMock(
+        "../../../services/twitch-chat-service",
+      );
+      const Discord = jest.requireMock(
+        "../../../services/discord-notification-service",
+      );
+
+      const ua = new UserAchievement(
+        "a1",
+        "Trophy",
+        "D",
+        10,
+        50,
+        "L",
+        { id: "t1", label: "points", data: "{}" },
+        {
+          achievementId: "a1",
+          userId: "u1",
+          count: 10,
+          finished: true,
+          labelActive: false,
+          acquiredDate: "",
+        },
+        "ch1",
+      );
+
+      await CacheDbService.update(ua, {
+        channelLogin: "chan",
+        userLogin: "user",
+      });
+
+      expect(DbService.addExpToUser).toHaveBeenCalledWith("u1", 50);
+      expect(BadgeService.tryGrantBadge).toHaveBeenCalled();
+      expect(
+        TwitchChat.TwitchChatService.sendAchievementUnlocked,
+      ).toHaveBeenCalledWith("chan", "user", "Trophy");
+      expect(
+        Discord.DiscordNotificationService.sendAchievementUnlocked,
+      ).toHaveBeenCalledWith("ch1", "user", "Trophy");
+    });
+
+    it("update throws when achieved is null", async () => {
+      const ua = {
+        id: "a1",
+        achieved: null,
+        channelId: "ch1",
+      } as unknown as UserAchievement;
+
+      await expect(CacheDbService.update(ua)).rejects.toThrow(
+        "UserAchievement.achieved is required for update",
+      );
+    });
+
+    it("update throws when userId is missing on achieved", async () => {
+      const ua = {
+        id: "a1",
+        achieved: { achievementId: "a1", userId: "" },
+        channelId: "ch1",
+      } as unknown as UserAchievement;
+
+      await expect(CacheDbService.update(ua)).rejects.toThrow(
+        "UserAchievement.achieved.userId is required for update",
+      );
+    });
+  });
+
+  describe("refreshExpiredCacheEntries with force", () => {
+    it("force=true bypasses backoff TTL and processes the key", async () => {
+      Redis.getPendingSyncKeys.mockResolvedValue(["user_achieved:u1:ch1"]);
+      Redis.getTtl.mockImplementation(async (key: string) => {
+        if (key.startsWith("flush:backoff:")) return 100;
+        return 50;
+      });
+      Redis.acquireLock.mockResolvedValue("token");
+      Redis.getAllSyncDataForCacheKey.mockResolvedValue([]);
+      Redis.removeFromSyncSet.mockResolvedValue(undefined);
+      Redis.releaseLock.mockResolvedValue(undefined);
+
+      await CacheDbService.refreshExpiredCacheEntries(true);
+
+      expect(Redis.acquireLock).toHaveBeenCalled();
+      expect(Redis.removeFromSyncSet).toHaveBeenCalledWith(
+        "user_achieved:u1:ch1",
+      );
+    });
+
+    it("when DbService.saveAchieved throws, sets backoff and increments failure count", async () => {
+      Redis.getPendingSyncKeys.mockResolvedValue(["user_achieved:u1:ch1"]);
+      Redis.getTtl.mockResolvedValue(-1);
+      Redis.acquireLock.mockResolvedValue("token");
+      Redis.getAllSyncDataForCacheKey.mockResolvedValue([
+        {
+          userId: "u1",
+          achievementId: "a1",
+          data: {
+            count: 1,
+            finished: false,
+            labelActive: false,
+            acquiredDate: "",
+          },
+        },
+      ]);
+      Redis.get.mockResolvedValue(null);
+      Redis.set.mockResolvedValue(undefined);
+      DbService.saveAchieved.mockRejectedValue(new Error("DB down"));
+      Redis.releaseLock.mockResolvedValue(undefined);
+
+      await CacheDbService.refreshExpiredCacheEntries();
+
+      expect(Redis.set).toHaveBeenCalledWith(
+        expect.stringContaining("flush:failures:"),
+        1,
+        expect.any(Number),
+      );
+      expect(Redis.set).toHaveBeenCalledWith(
+        expect.stringContaining("flush:backoff:"),
+        1,
+        expect.any(Number),
+      );
     });
   });
 });

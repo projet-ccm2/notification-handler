@@ -1,5 +1,3 @@
-import { Server } from "http";
-
 jest.mock("../../utils/logger", () => ({
   logger: {
     info: jest.fn(),
@@ -20,25 +18,35 @@ jest.mock("../../config/environment", () => ({
   },
 }));
 
+const RedisServiceMock = {
+  connect: jest.fn().mockResolvedValue(undefined),
+  disconnect: jest.fn().mockResolvedValue(undefined),
+};
 jest.mock("../../services/redis-service", () => ({
-  RedisService: {
-    connect: jest.fn().mockResolvedValue(undefined),
-    disconnect: jest.fn().mockResolvedValue(undefined),
-  },
+  RedisService: RedisServiceMock,
+}));
+jest.mock("../../services", () => ({
+  RedisService: RedisServiceMock,
 }));
 
+const CacheDbServiceMock = {
+  refreshExpiredCacheEntries: jest.fn().mockResolvedValue(undefined),
+};
 jest.mock("../../services/cache-db-service", () => ({
-  CacheDbService: {
-    refreshExpiredCacheEntries: jest.fn().mockResolvedValue(undefined),
-  },
+  CacheDbService: CacheDbServiceMock,
 }));
 
 describe("Production Server", () => {
   let originalEnv: string | undefined;
   let originalProcessExit: typeof process.exit;
   let originalProcessOn: typeof process.on;
-  let mockServer: any;
-  let mockApp: any;
+  let mockServer: { close: jest.Mock };
+  let mockApp: {
+    listen: jest.Mock;
+    get: jest.Mock;
+    disable: jest.Mock;
+    use: jest.Mock;
+  };
 
   beforeEach(() => {
     originalEnv = process.env.NODE_ENV;
@@ -46,17 +54,17 @@ describe("Production Server", () => {
     originalProcessOn = process.on;
 
     process.env.NODE_ENV = "production";
-    process.exit = jest.fn() as any;
-    process.on = jest.fn() as any;
+    process.exit = jest.fn() as unknown as typeof process.exit;
+    process.on = jest.fn() as unknown as typeof process.on;
 
     mockServer = {
-      close: jest.fn((callback) => {
+      close: jest.fn((callback?: () => void) => {
         if (callback) callback();
       }),
     };
 
     mockApp = {
-      listen: jest.fn((port, callback) => {
+      listen: jest.fn((_port: number, callback?: () => void) => {
         if (callback) callback();
         return mockServer;
       }),
@@ -72,7 +80,7 @@ describe("Production Server", () => {
       use: jest.fn().mockReturnThis(),
     };
     const expressFn = jest.fn(() => mockApp);
-    (expressFn as any).json = jest.fn();
+    (expressFn as unknown as { json: jest.Mock }).json = jest.fn();
     jest.doMock("express", () => ({
       __esModule: true,
       default: expressFn,
@@ -80,16 +88,24 @@ describe("Production Server", () => {
     }));
 
     jest.clearAllMocks();
+    jest.useFakeTimers();
+    RedisServiceMock.connect.mockResolvedValue(undefined);
+    RedisServiceMock.disconnect.mockResolvedValue(undefined);
+    CacheDbServiceMock.refreshExpiredCacheEntries.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
     process.env.NODE_ENV = originalEnv;
     process.exit = originalProcessExit;
     process.on = originalProcessOn;
+    jest.useRealTimers();
     jest.resetModules();
   });
 
-  it("should start server in production environment", () => {
+  const getHandler = (signal: "SIGTERM" | "SIGINT") =>
+    (process.on as jest.Mock).mock.calls.find((c) => c[0] === signal)?.[1];
+
+  it("registers listen + signal handlers in production", () => {
     require("../../index");
 
     expect(mockApp.listen).toHaveBeenCalledWith(3000, expect.any(Function));
@@ -97,33 +113,86 @@ describe("Production Server", () => {
     expect(process.on).toHaveBeenCalledWith("SIGINT", expect.any(Function));
   });
 
-  it("should handle SIGTERM in production", async () => {
+  it("connects to Redis on startup", async () => {
     require("../../index");
-
-    const sigtermHandler = (process.on as jest.Mock).mock.calls.find(
-      (call) => call[0] === "SIGTERM",
-    )?.[1];
-
-    expect(sigtermHandler).toBeDefined();
-
-    if (sigtermHandler) {
-      await sigtermHandler();
-      expect(mockServer.close).toHaveBeenCalled();
-    }
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(RedisServiceMock.connect).toHaveBeenCalled();
   });
 
-  it("should handle SIGINT in production", async () => {
+  it("logs error when Redis connect fails on startup", async () => {
+    RedisServiceMock.connect.mockRejectedValueOnce(new Error("conn refused"));
+    const { logger } = require("../../utils/logger");
+
     require("../../index");
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
 
-    const sigintHandler = (process.on as jest.Mock).mock.calls.find(
-      (call) => call[0] === "SIGINT",
-    )?.[1];
+    expect(logger.error).toHaveBeenCalledWith(
+      "Failed to connect to Redis",
+      expect.objectContaining({ error: "conn refused" }),
+    );
+  });
 
-    expect(sigintHandler).toBeDefined();
+  it("logs error when periodic refresh throws", async () => {
+    CacheDbServiceMock.refreshExpiredCacheEntries.mockRejectedValueOnce(
+      new Error("refresh fail"),
+    );
+    const { logger } = require("../../utils/logger");
 
-    if (sigintHandler) {
-      await sigintHandler();
-      expect(mockServer.close).toHaveBeenCalled();
-    }
+    require("../../index");
+    jest.advanceTimersByTime(60000);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "Failed to refresh expired cache entries",
+      expect.objectContaining({ error: "refresh fail" }),
+    );
+  });
+
+  it("SIGTERM: flushes cache, disconnects Redis, closes server, exits 0", async () => {
+    require("../../index");
+    const handler = getHandler("SIGTERM");
+    expect(handler).toBeDefined();
+
+    await handler();
+
+    expect(CacheDbServiceMock.refreshExpiredCacheEntries).toHaveBeenCalledWith(
+      true,
+    );
+    expect(RedisServiceMock.disconnect).toHaveBeenCalled();
+    expect(mockServer.close).toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(0);
+  });
+
+  it("SIGINT: same shutdown sequence as SIGTERM", async () => {
+    require("../../index");
+    const handler = getHandler("SIGINT");
+    expect(handler).toBeDefined();
+
+    await handler();
+
+    expect(CacheDbServiceMock.refreshExpiredCacheEntries).toHaveBeenCalledWith(
+      true,
+    );
+    expect(RedisServiceMock.disconnect).toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(0);
+  });
+
+  it("logs error and exits 1 when shutdown fails", async () => {
+    RedisServiceMock.disconnect.mockRejectedValueOnce(new Error("disco fail"));
+    const { logger } = require("../../utils/logger");
+
+    require("../../index");
+    const handler = getHandler("SIGTERM");
+    await handler();
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "Error during shutdown",
+      expect.objectContaining({ error: "disco fail" }),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
   });
 });

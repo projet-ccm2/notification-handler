@@ -21,6 +21,9 @@ interface Config {
   discordNotification: {
     baseUrl: string;
   };
+  userExistenceCache: {
+    ttlMs: number;
+  };
 }
 
 function validateConfig(): Config {
@@ -51,6 +54,12 @@ function validateConfig(): Config {
     },
     discordNotification: {
       baseUrl: process.env.DISCORD_NOTIF_URL || "http://localhost:3001",
+    },
+    userExistenceCache: {
+      ttlMs: Number.parseInt(
+        process.env.USER_EXISTENCE_CACHE_TTL_MS || "60000",
+        10,
+      ),
     },
   };
 }

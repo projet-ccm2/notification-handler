@@ -1,6 +1,7 @@
 import { TwitchEvent } from "../types";
 import { logger } from "../utils/logger";
-import { CacheDbService } from "../services/cache-db-service";
+import { CacheDbService, EventCtx } from "../services/cache-db-service";
+import { UserExistenceCache } from "../services/user-existence-cache";
 import {
   ChannelPointsCustomRewardPayload,
   ChannelPointsAutomaticRewardPayload,
@@ -36,6 +37,16 @@ export class ChannelPointRewardHandler {
         eventId: event.id,
         channel: event.channelLogin,
         user: event.userLogin,
+        context: "channel-points-handler",
+      });
+      return;
+    }
+    if (!(await UserExistenceCache.exists(userId))) {
+      logger.warn("Skipping event: user not in DB", {
+        eventId: event.id,
+        channel: event.channelLogin,
+        user: event.userLogin,
+        userId,
         context: "channel-points-handler",
       });
       return;
@@ -84,7 +95,7 @@ export class ChannelPointRewardHandler {
     userId: string,
     channelId: string,
     idChannelPointReward: string,
-    ctx: { channelLogin?: string; userLogin?: string } = {},
+    ctx: EventCtx = {},
   ): Promise<void> {
     const achievements = await CacheDbService.getAchievements(
       channelId,
@@ -122,7 +133,7 @@ export class ChannelPointRewardHandler {
     userId: string,
     channelId: string,
     costChannelPointReward: number,
-    ctx: { channelLogin?: string; userLogin?: string } = {},
+    ctx: EventCtx = {},
   ): Promise<void> {
     const achievements = await CacheDbService.getAchievements(
       channelId,
