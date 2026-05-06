@@ -1,0 +1,21 @@
+name: call-ci
+on:
+  push:
+    branches: ["develop", "main"]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: projet-ccm2/shared-workflows/.github/workflows/nodejs-ci.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      pr-number: ${{ github.event.number }}
+      pr-branch: ${{ github.head_ref }}
+      pr-base: ${{ github.base_ref }}
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      GITHUB_TOKEN_SECRET: ${{ secrets.GITHUB_TOKEN }}
