@@ -27,6 +27,7 @@ jobs:
       docker-tag: ${{ github.event.inputs.image-tag || format('dev-{0}', github.sha) }}
       artifact-registry-repository: "notification-handler-docker-int"
       environment: integration
+      service_type: back_prive
       cloud-run-service-name: notification-handler-int
     secrets:
       GCP_SA_KEY: ${{ secrets.INT_GCP_SA_KEY }}

@@ -21,6 +21,7 @@ jobs:
       docker-tag: ${{ github.event.inputs.image-tag || format('dev-{0}', github.sha) }}
       artifact-registry-repository: "notification-handler-docker-prod"
       environment: production
+      service_type: back_prive
       cloud-run-service-name: notification-handler-prod
 
     secrets:
